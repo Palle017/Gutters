@@ -2,7 +2,7 @@
 
 Website and simple customer-message system for John Wisdom's business, currently Everything Screen and Aluminum and being renamed Everything Screen and Gutters.
 
-This repository prepares migration of the existing public website from Netlify to GitHub Pages. The Netlify website remains the working public site during preparation. No custom domain has been selected or purchased.
+This repository prepares migration of the existing public website from Netlify to GitHub Pages. Netlify holds the original draft. Raj authorized PR 1 publication on GitHub Pages on October 25, 2026. No custom domain has been selected or purchased.
 
 ## Product direction
 
@@ -12,7 +12,7 @@ The website must not promise to solve every standing-water problem, diagnose str
 
 ## Small data model
 
-All quote requests and messages use the isolated Ubuntu SQLite database `gutters`, at `/var/lib/gutters/gutters.sqlite3`. Quote details are limited to customer address, home size, one/two stories and gutter length. Name and callback number support the contact request. Other database fields are technical identifiers, message records, timestamps and authorization/retry information required for messaging.
+The next messaging increment will use an isolated Ubuntu SQLite database `gutters`, at `/var/lib/gutters/gutters.sqlite3`. PR 1 uses direct call, text and email links; no server or database is active. Quote details are limited to customer address, home size, one/two stories and gutter length. Name and callback number support the contact request. Other database fields are technical identifiers, message records, timestamps and authorization/retry information required for messaging.
 
 Home size and gutter length are stored as supplied text. Unknown values stay empty. No price or measurement formula is invented. A ballpark is a preliminary estimate; John defines the rules and verifies the site before a firm quote.
 
