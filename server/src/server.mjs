@@ -1,6 +1,7 @@
 import http from 'node:http';
 import path from 'node:path';
-import {fileURLToPath,pathToFileURL} from 'node:url';
+import {fileURLToPath} from 'node:url';
+import {realpathSync} from 'node:fs';
 import {createApp} from './app.mjs';
 import {clientIdentity} from './client-ip.mjs';
 
@@ -123,4 +124,4 @@ function start() {
   function stop(){if(closing)return;closing=true;server.close(()=>{app.close();process.exit(0);});setTimeout(()=>process.exit(1),10000).unref();}
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
 }
-if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url)start();
+if(process.argv[1]&&realpathSync(process.argv[1])===realpathSync(fileURLToPath(import.meta.url)))start();
