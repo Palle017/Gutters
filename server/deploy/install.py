@@ -83,9 +83,10 @@ Path('/etc/systemd/system/gutters.service').write_bytes(unit.read_bytes())
 Path('/etc/systemd/system/gutters.service').chmod(0o644)
 subprocess.run(['systemctl','daemon-reload'],check=True)
 subprocess.run(['systemctl','enable','--now','gutters.service'],check=True)
+health_client=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 for attempt in range(30):
     try:
-        with urllib.request.urlopen('http://127.0.0.1:18965/healthz',timeout=2) as response:
+        with health_client.open('http://127.0.0.1:18965/healthz',timeout=2) as response:
             health=json.load(response)
         if health.get('ok') and health.get('storage')=='sqlite': break
     except (OSError,ValueError): pass
