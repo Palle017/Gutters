@@ -12,7 +12,7 @@ The website must not promise to solve every standing-water problem, diagnose str
 
 ## Small data model
 
-The next messaging increment will use an isolated Ubuntu SQLite database `gutters`, at `/var/lib/gutters/gutters.sqlite3`. PR 1 uses direct call, text and email links; no server or database is active. Quote details are limited to customer address, home size, one/two stories and gutter length. Name and callback number support the contact request. Other database fields are technical identifiers, message records, timestamps and authorization/retry information required for messaging.
+PR 2 runs an isolated Ubuntu SQLite database `gutters`, at `/var/lib/gutters/gutters.sqlite3`, behind the private loopback messaging service. The published website still uses direct call, text and email links; its online request form is a separate increment. Quote details are limited to customer address, home size, one/two stories and gutter length. Name and callback number support the contact request. Other database fields are technical identifiers, message records, timestamps and authorization/retry information required for messaging. See `docs/PR2-SQLITE-RELEASE.txt` for applied state and acceptance evidence.
 
 Home size and gutter length are stored as supplied text. Unknown values stay empty. No price or measurement formula is invented. A ballpark is a preliminary estimate; John defines the rules and verifies the site before a firm quote.
 
