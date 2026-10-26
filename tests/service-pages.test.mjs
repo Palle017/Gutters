@@ -54,3 +54,9 @@ test('rescreening copy preserves small jobs, exact screen types, and a qualified
   for(const value of ['pool enclosures','patios','window screens','door screens','sliding door screens','rusted screws','no minimum job size','Most rescreens are completed in a day'])assert.ok(source.includes(value),value);
   assert.doesNotMatch(source,/every rescreen.*one day|guaranteed.*day|minimum.*\$/i);
 });
+
+test('underground drainage copy keeps the owner-supplied no-grading boundary',async()=>{
+  const doc=new JSDOM(await readFile(path.join(site,'underground-drainage.html'),'utf8')).window.document;
+  assert.match(doc.querySelector('main').textContent,/We do not offer grading/);
+  assert.doesNotMatch(doc.querySelector('main').textContent,/French drains|sump pumps|foundation repair|guaranteed dry|40[- ]?(?:ft|foot)/i);
+});
