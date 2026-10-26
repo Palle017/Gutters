@@ -4,15 +4,15 @@ Raj owns the technical work. John Wisdom supplies business value, service scope 
 
 ## Scope
 
-Keep the product focused on profitable calls, estimate requests and customer follow-up. Netlify holds the original draft. PR 1 is published at https://palle017.github.io/Gutters/; publishing uses a manual workflow. No custom domain is owned or selected yet. Do not invent a domain, testimonials, response guarantees, prices, service warranties or customer-value claims.
+Keep the product focused on profitable calls, estimate requests and customer follow-up. Netlify holds the original draft. The static site is published by the manual GitHub Pages workflow at https://wisdomscreen.pro/. Tony owns the domain at Porkbun. Do not invent testimonials, response guarantees, prices, service warranties or customer-value claims.
 
 The portable Ubuntu messaging service uses one SQLite database named `gutters`, with default file `/var/lib/gutters/gutters.sqlite3`. All quote requests and their message history belong there. Website source remains in Git; do not put runtime records in Git or GitHub Pages.
 
-PR 2 installed `gutters.service` on Ubuntu with only `127.0.0.1:18965` listening. Preserve its data, root-only `/etc/gutters/gutters.env`, dedicated user and source release. The installer is intentionally first-install-only. No public proxy or website request-form activation is included; connecting that route is a separate authorized increment.
+PR 2 installed `gutters.service` on Ubuntu with only `127.0.0.1:18965` listening. Preserve its data, root-only `/etc/gutters/gutters.env`, dedicated user and source release. The installer is intentionally first-install-only. Raj authorized connecting the public photo/estimate form and upgrading the existing Ubuntu database on October 26, 2026. Keep the marketing site on GitHub Pages and use a dedicated HTTPS route for this service; never reuse Perfect Timing storage, credentials or routes. Verify the actual public workflow before claiming completion.
 
 ## Small schema
 
-Quote business fields are exactly customer address, home size, one/two stories, and gutter length. Preserve unknown values as empty/NULL. Home size and gutter length are raw supplied text until John defines units and calculations. Do not add rate, price, materials, labor, score, campaign, estimate-stage or other speculative business variables. Minimal contact and technical IDs/timestamps/authorization/idempotency records are necessary for the requested messaging, not a general CRM.
+Quote intake fields are exactly customer address, home size, one/two stories, and gutter length. Preserve unknown values as empty/NULL. Home size and gutter length are raw supplied text until John defines units and calculations. PR 8 added private photos and manually written estimate scope/amount, saved drafts and explicit publication. These are authorized workflow records; do not add automatic rates, calculations, materials, labor, scores, campaigns or speculative business variables. Minimal contact and technical IDs/timestamps/authorization/idempotency records support the requested messaging, not a general CRM.
 
 Only John can define future quote calculations. Do not evaluate customer text as code, invent a multiplier or issue an automatic quote. New information in a message does not silently rewrite the original quote fields.
 

@@ -1,5 +1,16 @@
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const KEY = /^[A-Za-z0-9_-]{43}$/;
+// Public customer pages stay on GitHub Pages; the private service runs on Ubuntu.
+// This is a public service address, never a credential or a customer return link.
+const LIVE_API_ORIGIN = 'https://serv2-linux.tail68bd87.ts.net:8443';
+const API_ORIGIN = location.origin === 'https://wisdomscreen.pro' ? LIVE_API_ORIGIN : '';
+
+export function serviceURL(path) {
+  if (typeof path !== 'string' || !/^\/(?:healthz$|conversations(?:\/|$))/.test(path) || path.includes('\\')) throw new Error('Invalid request-service path.');
+  const url = new URL(path, API_ORIGIN || location.origin);
+  if (url.origin !== (API_ORIGIN || location.origin) || url.username || url.password || url.hash || !/^\/(?:healthz$|conversations(?:\/|$))/.test(url.pathname)) throw new Error('Invalid request-service address.');
+  return API_ORIGIN ? url.href : path;
+}
 export const REQUEST_KEY = 'everything-gutters.request.v2';
 export const FIELDS = ['name', 'phone', 'details', 'address', 'homeSize', 'stories', 'gutterLength'];
 export const MAX_PHOTOS = 6;
@@ -45,6 +56,8 @@ const ERROR_TEXT = {
   invalid_filename: 'Please use a photo filename up to 150 characters, with a matching .jpg, .jpeg, .png, or .webp extension.',
   empty_photo: 'This photo is empty. Choose the original image file and try again.',
   storage_unavailable: 'The service could not confirm a save. Please retry; the same request will be used.',
+  service_busy: 'The service is handling other photos. Wait a few seconds, then retry. Your request details are kept.',
+  request_timeout: 'The connection took too long. Retry safely using the same request. Your request details are kept.',
   route_unavailable: 'The online request service is not available at this address yet. Please call or text John at (239) 355-3686.'
 };
 
@@ -56,7 +69,7 @@ export async function api(path, {method = 'GET', token, body, binary = false} = 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), body instanceof FormData ? 60000 : 25000);
   try {
-    const response = await fetch(path, {method, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: controller.signal});
+    const response = await fetch(serviceURL(path), {method, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer', signal: controller.signal});
     if (binary && response.ok) return response.blob();
     let data;
     try { data = await response.json(); } catch { throw new Error('The service did not confirm a save. Retry to check the same request, or call John at (239) 355-3686.'); }
@@ -74,16 +87,16 @@ export async function api(path, {method = 'GET', token, body, binary = false} = 
 }
 
 export const SERVICE_CHECK_MS = 4000;
-// Same-origin readiness probe. Any non-OK, non-JSON, timed-out, network-failed or file: result is "unavailable".
+// Probe the configured service. Failed or unrelated responses must not enable the form.
 export async function serviceAvailable() {
   if (location.protocol === 'file:') return false;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SERVICE_CHECK_MS);
   try {
-    const response = await fetch('/healthz', {method: 'GET', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: controller.signal});
+    const response = await fetch(serviceURL('/healthz'), {method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer', signal: controller.signal});
     if (!response.ok) return false;
     const data = await response.json();
-    return data?.ok === true;
+    return data?.ok === true && data.service === 'gutters-messaging' && data.storage === 'sqlite';
   } catch { return false; } finally { clearTimeout(timer); }
 }
 

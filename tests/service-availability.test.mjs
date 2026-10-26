@@ -30,6 +30,7 @@ const unavailableCases = {
   'a missing route (HTML 404)': () => new Response('<!doctype html><h1>404</h1>', {status: 404, headers: {'Content-Type': 'text/html'}}),
   'an OK response that is not JSON': () => new Response('<!doctype html><h1>Parked domain</h1>', {status: 200, headers: {'Content-Type': 'text/html'}}),
   'JSON that does not report ok:true': () => json({service: 'gutters-messaging'}),
+  'an unrelated service reporting ok:true': () => json({ok: true, service: 'another-service', storage: 'sqlite'}),
   'a network error': (window) => Promise.reject(new window.TypeError('Failed to fetch'))
 };
 function assertNotice(document) {
@@ -111,7 +112,7 @@ test('estimate page: a file: preview is never treated as available and makes no 
 });
 
 test('customer page: available service loads the saved request as before', async () => {
-  const {dom, calls} = await load('customer.html', 'customer.js', (window, path) => path === '/healthz' ? Promise.resolve(json({ok: true})) : Promise.resolve(customerView(window, path)), {fragment: '#id=' + id + '&key=' + key});
+  const {dom, calls} = await load('customer.html', 'customer.js', (window, path) => path === '/healthz' ? Promise.resolve(json({ok: true, service: 'gutters-messaging', storage: 'sqlite'})) : Promise.resolve(customerView(window, path)), {fragment: '#id=' + id + '&key=' + key});
   try {
     const {document} = dom.window;
     await waitFor(() => !document.querySelector('#customer-content').hidden);
