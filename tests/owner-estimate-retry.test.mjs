@@ -38,6 +38,7 @@ for (const kind of ['draft', 'publish']) {
       const dom = new JSDOM(ownerHTML, {url: origin + '/owner', runScripts: 'outside-only'});
       windows.push(dom);
       Object.defineProperty(dom.window, 'crypto', {value: webcrypto});
+      Object.defineProperty(dom.window, 'AbortController', {value: AbortController});
       if (retained) dom.window.sessionStorage.setItem(pendingKey, retained);
       dom.window.fetch = async (path, options = {}) => {
         if (failReadback && path === '/owner/api/conversations/' + id && (!options.method || options.method === 'GET')) {

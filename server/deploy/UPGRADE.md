@@ -30,12 +30,24 @@ Static serving remains off. Proxy trust defaults to `false`; use
 Tailscale ingress overwrites the forwarded client header. This option does not
 configure or authorize public ingress itself.
 
-The HTTP adapter admits two simultaneous request bodies or private photo responses,
-keeps the connection ceiling at 64, and uses absolute 15-second ordinary and
-75-second photo deadlines. Excess work receives a retryable busy response; an
-early-closed upload can instead appear as a connection reset. Retrying must retain
-the same operation and content. These safeguards preserve the existing 256 MiB
-systemd limit; verify actual memory behavior on Ubuntu before public launch.
+The HTTP adapter admits at most two simultaneous request bodies or private photo
+responses: one public transfer and one reserved for an owner whose bearer key and
+owner-origin policy have already been checked. A forged owner route, credential,
+or identity header cannot claim the reserve. Each public client can hold at most
+one transfer; an owner's authenticated transfer is separate so public activity
+behind the same address does not block that owner. Admission uses the verified
+proxy identity when configured. The slot remains occupied until both application
+work and the response finish or close, including slow photo downloads.
+
+The connection ceiling remains 64, with absolute 15-second ordinary and 75-second
+photo deadlines. Excess work receives a retryable busy response; an early-closed
+upload can instead appear as a connection reset. Retrying must retain the same
+operation and content. These limits bound admitted concurrent transfers, not
+total Node/SQLite memory. Multipart parsing, SQLite BLOB reads, HTTP response
+copies and garbage collection add memory beyond the photo bytes. The existing
+256 MiB systemd limit is unchanged and is not proven sufficient by local tests.
+Measure the deployed process/cgroup peak under permitted 5 MiB upload/download
+and owner activity before claiming Ubuntu capacity or public launch acceptance.
 
 The updater locks concurrent upgrades, validates the source archive, and keeps
 the former release. Before staging, it checks free space on the relevant devices
@@ -59,6 +71,17 @@ server. Protected receipts record source, backup, and verification status withou
 printing credentials or customer contents. A rollback records both the attempted
 commit and active previous commit in the backup receipt and deployment receipt;
 it cannot leave a successful new-release receipt after restoring the old code.
+
+If recovery itself fails, the updater attempts to replace both private receipts
+with `rollback_failed`. The warning records only fixed failure classifications
+and the recovery step, never exception text, commands or environment values.
+`active_source_commit` and `running_pid` are unknown (`null`) until the old process
+has been verified; a pointer switch or restart attempt alone does not prove the
+old release is running. A failure writing either receipt does not prevent trying
+the other. Storage failure can make both warnings unavailable, so an unsuccessful
+updater exit must be investigated even if an older receipt still says `running`.
+Inspect the actual source pointer, protected configuration, systemd process and
+loopback health before retrying. The live database is never restored by recovery.
 
 Normal SIGTERM, SIGINT and SIGHUP interruptions trigger the same recovery; further
 termination signals are ignored while recovery completes. The tests exercise

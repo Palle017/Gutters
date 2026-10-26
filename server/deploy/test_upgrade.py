@@ -328,6 +328,126 @@ class UpgradeTests(unittest.TestCase):
     def test_final_receipt_failure_rewrites_deployment_receipt_to_active_old_release(self):
         self.exercise_transaction('final_receipt')
 
+    def test_failed_recovery_records_safe_uncertainty_and_preserves_accepted_writes(self):
+        cases = {
+            'configuration': 'restore_configuration',
+            'pointer': 'restore_source_pointer',
+            'restart': 'restart_previous_service',
+            'health': 'previous_service_health',
+            'process': 'verify_previous_process',
+            'receipt': 'record_rollback_receipts',
+        }
+        secret = 'SYNTHETIC-SECRET-MUST-NOT-ENTER-RECEIPTS'
+        previous_handler = signal.getsignal(signal.SIGTERM)
+        for failure, expected_step in cases.items():
+            with self.subTest(failure=failure), ExitStack() as stack:
+                case = self.temp / failure
+                data, backup = case / 'data', case / 'backup'
+                data.mkdir(parents=True); backup.mkdir()
+                database, environment = data / 'gutters.sqlite3', case / 'gutters.env'
+                with closing(sqlite3.connect(database)) as db:
+                    db.execute('CREATE TABLE retained(id INTEGER PRIMARY KEY, value TEXT)')
+                    db.execute('INSERT INTO retained VALUES(1, ?)', ('before',))
+                    db.commit()
+                before = upgrade.database_snapshot(database)
+                old_env = b'GUTTERS_OWNER_TOKEN=' + b'A' * 43 + b'\n'
+                new_env = old_env + b'GUTTERS_TRUST_PROXY=tailscale\n'
+                environment.write_bytes(old_env)
+                old_release, release = case / 'old', case / COMMIT
+                old_release.mkdir(); release.mkdir()
+                active, restarts = [old_release], []
+                real_write = upgrade.atomic_write
+                def fail():
+                    raise RuntimeError(secret)
+                def write(destination, content, mode=0o600):
+                    if destination == environment and content == old_env:
+                        self.assertEqual(signal.getsignal(signal.SIGTERM), signal.SIG_IGN)
+                        if failure == 'configuration':
+                            fail()
+                    if (failure == 'receipt' and destination != environment
+                            and json.loads(content).get('state') == 'rolled_back'):
+                        raise OSError(secret)
+                    return real_write(destination, content, mode)
+                def switch(target):
+                    if target == old_release and failure == 'pointer':
+                        fail()
+                    active[0] = target
+                def restart(*_args, **_kwargs):
+                    restarts.append(active[0])
+                    if len(restarts) == 2 and failure == 'restart':
+                        self.assertEqual(signal.getsignal(signal.SIGTERM), signal.SIG_IGN)
+                        raise subprocess.CalledProcessError(1, ['synthetic', secret], stderr=secret)
+                    return SimpleNamespace(returncode=0)
+                def health():
+                    if active[0] == release:
+                        with closing(sqlite3.connect(database)) as db:
+                            db.execute('INSERT INTO retained VALUES(2, ?)', ('accepted-during-upgrade',))
+                            db.commit()
+                        if failure == 'restart':
+                            raise upgrade.UpgradeInterrupted(secret)
+                        fail()
+                    if failure == 'health':
+                        fail()
+                def running(target):
+                    if target == old_release and failure == 'process':
+                        fail()
+                    return 100
+                for name, value in [('DATA', data), ('DATABASE', database), ('ENVIRONMENT', environment)]:
+                    stack.enter_context(patch.object(upgrade, name, value))
+                stack.enter_context(patch.object(upgrade, 'sync_directory', return_value=None))
+                stack.enter_context(patch.object(upgrade, 'atomic_write', side_effect=write))
+                stack.enter_context(patch.object(upgrade, 'switch_release', side_effect=switch))
+                stack.enter_context(patch.object(upgrade, 'current_release', side_effect=lambda: active[0]))
+                stack.enter_context(patch.object(upgrade.subprocess, 'run', side_effect=restart))
+                stack.enter_context(patch.object(upgrade, 'health', side_effect=health))
+                stack.enter_context(patch.object(upgrade, 'verify_running_release', side_effect=running))
+                receipt = {'source_commit': COMMIT}
+                with self.assertRaisesRegex(RuntimeError, 'recovery failed') as caught:
+                    upgrade.apply_update(old_release, release, old_env, new_env, receipt, before, backup)
+                self.assertNotIn(secret, str(caught.exception))
+                for path in (data / 'deployment.json', backup / 'upgrade-receipt.json'):
+                    text = path.read_text()
+                    self.assertNotIn(secret, text)
+                    self.assertNotIn('A' * 43, text)
+                    saved = json.loads(text)
+                    self.assertEqual(saved['state'], 'rollback_failed')
+                    self.assertEqual(saved['recovery_failure']['step'], expected_step)
+                    self.assertEqual(saved['upgrade_failure'], 'interrupted' if failure == 'restart' else 'check_failed')
+                    self.assertFalse(saved['database_restored'])
+                    self.assertEqual(saved['attempted_source_commit'], COMMIT)
+                    self.assertEqual(saved['rollback_runtime_verified'], failure == 'receipt')
+                    self.assertEqual(saved['active_source_commit'], old_release.name if failure == 'receipt' else None)
+                with closing(sqlite3.connect(database)) as db:
+                    self.assertEqual(db.execute('SELECT value FROM retained ORDER BY id').fetchall(),
+                                     [('before',), ('accepted-during-upgrade',)])
+            self.assertEqual(signal.getsignal(signal.SIGTERM), previous_handler)
+
+    def test_recovery_failure_attempts_second_receipt_when_first_is_unwritable(self):
+        # A failed receipt destination must not suppress the other durable warning.
+        environment = self.temp / 'gutters.env'
+        environment.write_bytes(b'old')
+        backup = self.temp / 'backup'; backup.mkdir()
+        data = self.temp / 'data'; data.mkdir()
+        old_release, release = self.temp / 'old', self.temp / COMMIT
+        real_write, attempted = upgrade.atomic_write, []
+        def write(destination, content, mode=0o600):
+            if destination == environment:
+                raise OSError('SYNTHETIC private configuration detail')
+            if json.loads(content).get('state') == 'rollback_failed':
+                attempted.append(destination)
+                if destination == data / 'deployment.json':
+                    raise OSError('SYNTHETIC private disk detail')
+            return real_write(destination, content, mode)
+        with patch.object(upgrade, 'DATA', data), patch.object(upgrade, 'ENVIRONMENT', environment), \
+                patch.object(upgrade, 'current_release', return_value=old_release), \
+                patch.object(upgrade, 'sync_directory', return_value=None), \
+                patch.object(upgrade, 'atomic_write', side_effect=write):
+            with self.assertRaisesRegex(RuntimeError, 'may be unavailable'):
+                upgrade.apply_update(old_release, release, b'old', b'new', {'source_commit': COMMIT}, {}, backup)
+        self.assertEqual(attempted, [data / 'deployment.json', backup / 'upgrade-receipt.json'])
+        self.assertEqual(json.loads((backup / 'upgrade-receipt.json').read_text())['state'], 'rollback_failed')
+        self.assertEqual(environment.read_bytes(), b'old')
+
     def test_concurrent_release_change_is_rejected_before_any_configuration_write(self):
         environment = self.temp / 'gutters.env'
         environment.write_bytes(b'unchanged')

@@ -293,6 +293,21 @@ def verify_running_release(release):
     return int(value)
 
 
+def failure_code(error):
+    """Bounded classifications only: exception text/commands may contain secrets."""
+    if isinstance(error, UpgradeInterrupted):
+        return 'interrupted'
+    if isinstance(error, subprocess.TimeoutExpired):
+        return 'process_timeout'
+    if isinstance(error, subprocess.CalledProcessError):
+        return 'process_failed'
+    if isinstance(error, OSError):
+        return 'io_failed'
+    if isinstance(error, RuntimeError):
+        return 'check_failed'
+    return 'unexpected_failure'
+
+
 def apply_update(old_release, release, old_env, new_env, receipt, before, backup_dir):
     require(ENVIRONMENT.read_bytes() == old_env, 'Configuration changed during preparation; nothing switched.')
     require(current_release() == old_release.resolve(),
@@ -317,25 +332,51 @@ def apply_update(old_release, release, old_env, new_env, receipt, before, backup
                        tables={name: entry['rows'] for name, entry in current.items()})
         atomic_write(DATA / 'deployment.json', (json.dumps(receipt, indent=2) + '\n').encode())
         atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
-    except BaseException:
+    except BaseException as upgrade_error:
         # Never restore the database: writes accepted during deployment remain durable.
         # A second normal termination signal must not interrupt recovery midway.
         with interruption_guard(ignore=True):
-            atomic_write(ENVIRONMENT, old_env)
-            switch_release(old_release)
-            subprocess.run(['systemctl', 'restart', SERVICE], check=True)
-            health()
-            restored_pid = verify_running_release(old_release)
-            receipt.update(state='rolled_back', database_restored=False, running_pid=restored_pid,
-                           attempted_source_commit=receipt['source_commit'],
-                           source_commit=old_release.name, active_source_commit=old_release.name,
-                           attempted_public_origin=receipt.get('public_origin'),
-                           public_origin=environment_values(old_env).get('GUTTERS_PUBLIC_ORIGIN'),
-                           allowed_origin=environment_values(old_env).get('GUTTERS_ALLOWED_ORIGINS'),
-                           attempted_proxy_mode=receipt.get('proxy_mode'),
-                           proxy_mode=environment_values(old_env).get('GUTTERS_TRUST_PROXY', 'false'))
-            atomic_write(DATA / 'deployment.json', (json.dumps(receipt, indent=2) + '\n').encode())
-            atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
+            recovery_step = 'restore_configuration'
+            restored_pid = None
+            try:
+                atomic_write(ENVIRONMENT, old_env)
+                recovery_step = 'restore_source_pointer'
+                switch_release(old_release)
+                recovery_step = 'restart_previous_service'
+                subprocess.run(['systemctl', 'restart', SERVICE], check=True)
+                recovery_step = 'previous_service_health'
+                health()
+                recovery_step = 'verify_previous_process'
+                restored_pid = verify_running_release(old_release)
+                receipt.update(state='rolled_back', database_restored=False, running_pid=restored_pid,
+                               attempted_source_commit=receipt['source_commit'],
+                               source_commit=old_release.name, active_source_commit=old_release.name,
+                               attempted_public_origin=receipt.get('public_origin'),
+                               public_origin=environment_values(old_env).get('GUTTERS_PUBLIC_ORIGIN'),
+                               allowed_origin=environment_values(old_env).get('GUTTERS_ALLOWED_ORIGINS'),
+                               attempted_proxy_mode=receipt.get('proxy_mode'),
+                               proxy_mode=environment_values(old_env).get('GUTTERS_TRUST_PROXY', 'false'))
+                recovery_step = 'record_rollback_receipts'
+                atomic_write(DATA / 'deployment.json', (json.dumps(receipt, indent=2) + '\n').encode())
+                atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
+            except BaseException as recovery_error:
+                receipt.update(state='rollback_failed', database_restored=False,
+                               attempted_source_commit=release.name, rollback_target_commit=old_release.name,
+                               active_source_commit=old_release.name if restored_pid is not None else None,
+                               running_pid=restored_pid, rollback_runtime_verified=restored_pid is not None,
+                               upgrade_failure=failure_code(upgrade_error),
+                               recovery_failure={'step': recovery_step, 'code': failure_code(recovery_error)})
+                # Try both independent protected receipts even if one location
+                # is unwritable. Neither a stale success receipt nor a failed
+                # recovery may be reported as a restored/running release.
+                for destination in (DATA / 'deployment.json', receipt_path):
+                    try:
+                        atomic_write(destination, (json.dumps(receipt, indent=2) + '\n').encode())
+                    except BaseException:
+                        pass
+                raise RuntimeError('Upgrade recovery failed; service state requires inspection. '
+                                   'Database preserved. Private rollback_failed receipts were attempted '
+                                   'but may be unavailable.') from None
         raise RuntimeError('Upgrade failed; prior code/configuration restored, database preserved. Inspect the private receipt.') from None
     return receipt
 
