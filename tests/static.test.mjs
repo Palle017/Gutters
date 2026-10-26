@@ -13,6 +13,7 @@ test('public pages identify John and have working portable call/navigation links
     assert.doesNotMatch(html,/everythingscreenandaluminum\.com|fixingfortmyers\.com|239.397.2048/);
     const doc=new JSDOM(html).window.document;
     assert.ok(doc.querySelector('a[href="tel:+12393553686"]'));
+    assert.ok(doc.querySelector('a[href="sms:+12393553686"]'),'John text link on '+page);
     assert.equal(doc.querySelectorAll('h1').length,1);
     for(const node of doc.querySelectorAll('a[href],script[src],link[rel="stylesheet"]')){
       const value=node.getAttribute('href')||node.getAttribute('src');
@@ -21,6 +22,11 @@ test('public pages identify John and have working portable call/navigation links
       assert.ok((await stat(path.resolve(site,value.split(/[?#]/)[0]))).isFile(),value);
     }
   }
+  const home=new JSDOM(await readFile(path.join(site,'index.html'),'utf8')).window.document;
+  assert.deepEqual([...home.querySelectorAll('.hero .hero-ctas a')].map(link=>link.getAttribute('href')),['tel:+12393553686','sms:+12393553686']);
+  assert.match(home.querySelector('.hero-lead').textContent,/underground drainage/);
+  const contact=new JSDOM(await readFile(path.join(site,'contact.html'),'utf8')).window.document;
+  assert.equal(contact.querySelectorAll('form').length,0,'first release uses direct call/text/email');
 });
 test('Pages publication requires explicit manual workflow and static-only artifact',async()=>{
   const yaml=await readFile(path.join(root,'.github/workflows/pages.yml'),'utf8');
