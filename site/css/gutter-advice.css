@@ -1,0 +1,21 @@
+/* Advice module: native details remain usable without JavaScript. */
+.americana .advice-content{padding:54px 7%;max-width:1600px;margin:auto}
+.americana .advice-content>p{max-width:78ch;font-size:16px;margin:20px 0}
+.americana .advice-content .advice-safety{border-left:4px solid var(--navy);padding:12px 20px;background:#fff5}
+.americana .advice-cards{display:grid;gap:18px;margin-top:32px}
+.americana .advice-cards details{background:#fff9ed;border:1px solid #9b886d;border-radius:3px;overflow:visible;scroll-margin-top:24px}
+.americana .advice-cards summary{font:700 20px/1.5 Georgia,serif;cursor:pointer;padding:20px 24px;min-height:64px}
+.americana .advice-cards summary:hover{text-decoration:underline;text-underline-offset:4px}
+.americana .advice-cards summary:focus-visible{outline:3px solid #8d342a;outline-offset:4px}
+.americana .advice-cards details[open] summary{border-bottom:1px solid #9b886d}
+.americana .advice-copy{padding:6px 24px 24px;max-width:90ch}
+.americana .advice-copy h3{font:700 18px/1.4 Arial,sans-serif;letter-spacing:0;margin:22px 0 6px}
+.americana .advice-copy p{font-size:16px;line-height:1.75}
+.americana .advice-content a{color:#813126;text-decoration:underline;text-underline-offset:4px}
+.americana .advice-copy .advice-sources{font-size:14px;font-weight:700;margin-top:22px}
+.americana .advice-readings a{display:block;padding:8px 0;font-size:14px}
+.americana .advice-contact{border-top:1px solid #9b886d;margin-top:42px;padding-top:32px}
+.americana .advice-contact p{max-width:78ch;font-size:16px;margin:20px 0}
+.americana .advice-actions{display:flex;flex-wrap:wrap;gap:12px 28px}
+.americana .advice-actions a{min-height:48px;padding:10px 0;font-size:17px;font-weight:700}
+@media(max-width:650px){.americana .advice-content{padding:36px 7%}.americana .advice-cards summary{padding:18px;font-size:20px}.americana .advice-copy{padding:4px 18px 22px}.americana .advice-actions{flex-direction:column;gap:0}}
