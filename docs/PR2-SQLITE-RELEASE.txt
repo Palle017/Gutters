@@ -1,0 +1,50 @@
+PR 2 — Ubuntu SQLite request and message store
+Applied and checked October 25, 2026 (America/New_York)
+
+Installed source commit: 5d41ea69a440d6d783f68a1a28fafd91c9499ce9
+Server: serv2-linux, Ubuntu 24.04
+Service: gutters.service, enabled and active
+Runtime: installed Node 26.12.0; service source supports Node 24–26
+Database: /var/lib/gutters/gutters.sqlite3
+Listener: 127.0.0.1:18965 only
+Environment file: /etc/gutters/gutters.env, root-only 0600
+Database and directory: dedicated gutters account, database 0600, directory 0700
+
+Quote business columns (and no others):
+- address
+- size_of_home (raw supplied text or NULL)
+- stories (1, 2, or NULL)
+- gutter_length (raw supplied text or NULL)
+The table also has a conversation_id technical foreign key. Name and callback
+number are stored with the request. Message and technical access/retry tables
+support the requested conversation. No pricing calculation or pricing/rate/
+material/stage/marketing columns are present.
+
+Verification performed:
+- 15 real SQLite backend tests plus 2 public-site regression checks passed.
+- Two exact-source Linux Verify runs passed before installation.
+- An isolated source archive was installed without replacing any existing
+  application paths, accounts, listeners or Tailscale routing.
+- One clearly labeled synthetic QA request was saved, with all four supplied
+  quote details, an owner reply and a customer follow-up.
+- A real service restart preserved all 16 transcript rows and 3 operation
+  receipts. Repeating the same request left exactly one QA request.
+- Changed-content retries were rejected; wrong owner/guest access was denied.
+- SQLite integrity, the four-field schema and foreign key passed.
+- An online backup was opened as a separate database; its integrity, schema
+  and counts matched. The live database was never replaced by the backup.
+
+Operational state:
+The API and owner inbox are available on the server's private loopback listener.
+No public reverse proxy or website form is connected in PR 2. The published
+GitHub Pages site remains the call/text release from PR 1. No customer email,
+SMS, booking or other external provider was activated.
+
+One labeled synthetic QA request remains as acceptance evidence; it is not a
+real customer inquiry. Runtime data, the owner key and customer access keys
+remain on Ubuntu and are excluded from GitHub.
+
+The backup was checked once. This release does not claim a recurring backup
+schedule or server/disk disaster recovery. Future source updates must preserve
+the existing SQLite data and protected environment rather than rerun the
+first-install script, which deliberately refuses existing application paths.

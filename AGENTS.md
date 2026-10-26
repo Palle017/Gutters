@@ -4,9 +4,11 @@ Raj owns the technical work. John Wisdom supplies business value, service scope 
 
 ## Scope
 
-Keep the product focused on profitable calls, estimate requests and customer follow-up. Preserve the working Netlify site until the replacement is checked and Raj directs the migration. GitHub Pages publication is prepared as a manual workflow; no domain is owned or selected yet. Do not invent a domain, testimonials, response guarantees, prices, service warranties or customer-value claims.
+Keep the product focused on profitable calls, estimate requests and customer follow-up. Netlify holds the original draft. PR 1 is published at https://palle017.github.io/Gutters/; publishing uses a manual workflow. No custom domain is owned or selected yet. Do not invent a domain, testimonials, response guarantees, prices, service warranties or customer-value claims.
 
 The portable Ubuntu messaging service uses one SQLite database named `gutters`, with default file `/var/lib/gutters/gutters.sqlite3`. All quote requests and their message history belong there. Website source remains in Git; do not put runtime records in Git or GitHub Pages.
+
+PR 2 installed `gutters.service` on Ubuntu with only `127.0.0.1:18965` listening. Preserve its data, root-only `/etc/gutters/gutters.env`, dedicated user and source release. The installer is intentionally first-install-only. No public proxy or website request-form activation is included; connecting that route is a separate authorized increment.
 
 ## Small schema
 
