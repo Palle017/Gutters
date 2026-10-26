@@ -35,15 +35,23 @@ export function createHTTPServer(app,{
   if(configuredOrigin!==publicOrigin)throw Error('Use a canonical public origin.');
   for(const value of [maxBufferedRequests,requestDeadline,photoDeadline,headersTimeout,maxConnections])if(!Number.isSafeInteger(value)||value<1)throw Error('Invalid HTTP resource limit.');
   const origins=new Set([publicOrigin,...allowedOrigins]);
-  let bufferedRequests=0;
+  // Keep one transfer slot exclusively for an authenticated owner. Public
+  // clients cannot occupy it with a slow upload/download or a forged key.
+  // A one-slot test/preview configuration has no additional reserved capacity.
+  const publicLimit=Math.max(1,maxBufferedRequests-1),ownerLimit=maxBufferedRequests>1?1:0;
+  let bufferedRequests=0,ownerRequests=0;
+  const publicClients=new Set();
   const server=http.createServer({connectionsCheckingInterval:1000},async(req,res)=>{
     // The reader also observes errors, but early rejections may have no reader.
     req.on('error',()=>{});
-    let admitted=false,appDone=false,responseDone=false,timer,body;
+    let admitted=false,ownerSlot=false,admittedClient,appDone=false,responseDone=false,timer,body;
     const release=()=>{
       if(!appDone||!responseDone)return;
       clearTimeout(timer);
-      if(admitted){admitted=false;bufferedRequests--;}
+      if(admitted){
+        admitted=false;bufferedRequests--;
+        if(ownerSlot)ownerRequests--;else publicClients.delete(admittedClient);
+      }
     };
     const finished=()=>{responseDone=true;release();};
     res.once('finish',finished);
@@ -74,18 +82,23 @@ export function createHTTPServer(app,{
       const photoUpload=req.method==='POST'&&/^\/conversations\/[a-f0-9-]{36}\/photos$/.test(pathname);
       const photoDownload=req.method==='GET'&&/^\/(?:owner\/api\/)?conversations\/[a-f0-9-]{36}\/photos\/[a-f0-9-]{36}$/.test(pathname);
       const hasBody=Boolean(req.headers['transfer-encoding'])||Number(req.headers['content-length']||0)>0;
-      if(hasBody||photoDownload){
-        if(bufferedRequests>=maxBufferedRequests){reject(503,'service_busy',{'Retry-After':'5'});return;}
-        bufferedRequests++;admitted=true;
-      }
-      // This timer is absolute: trickling bytes cannot extend it. Photo reads
-      // hold the same slot while a slow peer retains the response buffer.
-      timer=setTimeout(()=>reject(408,'request_timeout'),photoUpload||photoDownload?photoDeadline:requestDeadline);
-      timer.unref();
       const headers=new Headers();
       for(const [key,value] of Object.entries(req.headers))if(value!==undefined&&!['x-gutters-client-key','oai-authenticated-user-id','oai-authenticated-user-email'].includes(key))headers.set(key,Array.isArray(value)?value.join(','):value);
       try{headers.set('x-gutters-client-key',isAPI?clientIdentity(req,trustProxy):req.socket.remoteAddress||'unknown');}
       catch{reject(400,'invalid_client_address');return;}
+      if(hasBody||photoDownload){
+        const owner=ownerLimit>0&&pathname.startsWith('/owner/api/')&&app.isOwnerAuthorized?.({method:req.method,headers})===true;
+        const key=headers.get('x-gutters-client-key');
+        if(bufferedRequests>=maxBufferedRequests||(owner?ownerRequests>=ownerLimit:publicClients.size>=publicLimit||publicClients.has(key))){
+          reject(503,'service_busy',{'Retry-After':'5'});return;
+        }
+        bufferedRequests++;admitted=true;ownerSlot=owner;admittedClient=key;
+        if(owner)ownerRequests++;else publicClients.add(key);
+      }
+      // This timer is absolute: trickling bytes cannot extend it. Photo reads
+      // hold their lane until both app work and the response finish/close.
+      timer=setTimeout(()=>reject(408,'request_timeout'),photoUpload||photoDownload?photoDeadline:requestDeadline);
+      timer.unref();
       if(!['GET','HEAD'].includes(req.method))body=requestBody(req);
       const request=new Request(url,{method:req.method,headers,...(body?{body:body.stream,duplex:'half'}:{})});
       const response=await app.fetch(request);

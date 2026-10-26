@@ -33,7 +33,7 @@ test('owner can open the supplied reply email and sees honest disabled alert sta
   const token='O'.repeat(43),app=createApp({dbPath:':memory:',ownerToken:token,publicOrigin:origin});
   const raw={schemaVersion:2,conversationId:randomUUID(),operationId:randomUUID(),accessToken:'T'.repeat(43),intake:{name:'Synthetic email contact',phone:'2395550100',email:'customer+project@example.invalid'},answers:[{field:'name',state:'provided',answer:'Synthetic email contact'},{field:'phone',state:'provided',answer:'2395550100'},{field:'email',state:'provided',answer:'customer+project@example.invalid'}]};
   app.store.create(validateCreate(raw));
-  const dom=new JSDOM(ownerHTML,{url:origin+'/owner',runScripts:'outside-only'});Object.defineProperty(dom.window,'crypto',{value:webcrypto});
+  const dom=new JSDOM(ownerHTML,{url:origin+'/owner',runScripts:'outside-only'});Object.defineProperty(dom.window,'crypto',{value:webcrypto});Object.defineProperty(dom.window,'AbortController',{value:AbortController});
   dom.window.fetch=(url,options={})=>app.fetch(new Request(origin+url,{...options,headers:{...options.headers,Origin:origin}}));
   dom.window.eval(ownerHTML.match(/<script type="module">([\s\S]*?)<\/script>/)[1]);
   try{

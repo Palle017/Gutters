@@ -47,22 +47,63 @@ function multipart(size=PHOTO_MAX_BYTES) {
 }
 async function until(check) {for(let i=0;i<100;i++){if(await check())return;await delay(10);}assert.fail('Condition did not settle.');}
 
-test('two real 5 MiB uploads exclude eight additional bodies while health/preflight/inbox remain available',async t=>{
-  const x=await setup(t),uploads=[multipart(),multipart()];
-  const holds=uploads.map(photo=>x.start(x.photoPath,{method:'POST',headers:{...photo.headers,Authorization:'Bearer '+x.customer.accessToken}}));
-  for(const [i,hold] of holds.entries())hold.req.write(uploads[i].body.subarray(0,uploads[i].body.length-64));
+test('one real 5 MiB public upload preserves authenticated owner writes and photo access while excess bodies are bounded',async t=>{
+  const x=await setup(t),first=multipart(),upload=multipart();
+  const saved=await x.call(x.photoPath,{method:'POST',headers:{...first.headers,Authorization:'Bearer '+x.customer.accessToken},body:first.body});
+  const hold=x.start(x.photoPath,{method:'POST',headers:{...upload.headers,Authorization:'Bearer '+x.customer.accessToken}});
+  hold.req.write(upload.body.subarray(0,upload.body.length-64));
   await delay(80);
-  const rejected=await Promise.all(Array.from({length:8},()=>{const attempt=x.start(x.photoPath,{method:'POST',headers:{...uploads[0].headers,Authorization:'Bearer '+x.customer.accessToken}});attempt.req.write(uploads[0].body.subarray(0,256));return attempt.result;}));
+  const rejected=await Promise.all(Array.from({length:8},()=>{const attempt=x.start(x.photoPath,{method:'POST',headers:{...upload.headers,Authorization:'Bearer '+x.customer.accessToken}});attempt.req.write(upload.body.subarray(0,256));return attempt.result;}));
   for(const out of rejected){assert.equal(out.status,503);assert.equal(out.data.error,'service_busy');assert.equal(out.headers['retry-after'],'5');assert.equal(out.headers['cache-control'],'no-store');assert.equal(out.headers['access-control-allow-origin'],customerOrigin);}
   assert.equal((await x.call('/healthz')).status,200);
   assert.equal((await x.call('/conversations',{method:'OPTIONS'})).status,204);
   assert.equal((await x.call('/owner/api/conversations',{headers:{Origin:publicOrigin,Authorization:'Bearer '+x.ownerToken}})).status,200);
-  for(const [i,hold] of holds.entries())hold.req.end(uploads[i].body.subarray(-64));
-  const completed=await Promise.all(holds.map(x=>x.result));for(const out of completed)assert.equal(out.status,201);
-  const retried=await x.call(x.photoPath,{method:'POST',headers:{...uploads[0].headers,Authorization:'Bearer '+x.customer.accessToken},body:uploads[0].body});
+  const ownerHeaders={Origin:publicOrigin,Authorization:'Bearer '+x.ownerToken,'Content-Type':'application/json'};
+  const message='/owner/api/conversations/'+x.customer.conversationId+'/messages';
+  const reply=()=>JSON.stringify({operationId:randomUUID(),body:'Synthetic owner reply during public upload'});
+  assert.equal((await x.call(message,{method:'POST',headers:ownerHeaders,body:reply()})).status,201);
+  const photo=await x.call('/owner/api'+x.photoPath+'/'+saved.data.photo.id,{headers:ownerHeaders});
+  assert.equal(photo.status,200);assert.equal(photo.bytes.length,PHOTO_MAX_BYTES);
+  for(const headers of [{...ownerHeaders,Authorization:'Bearer '+token()},{...ownerHeaders,Origin:customerOrigin},{...ownerHeaders,Authorization:undefined}]){
+    if(headers.Authorization===undefined)delete headers.Authorization;
+    const denied=await x.call(message,{method:'POST',headers,body:reply()});assert.equal(denied.status,503);
+  }
+  hold.req.end(upload.body.subarray(-64));assert.equal((await hold.result).status,201);
+  const retried=await x.call(x.photoPath,{method:'POST',headers:{...upload.headers,Authorization:'Bearer '+x.customer.accessToken},body:upload.body});
   assert.equal(retried.status,201);assert.equal(retried.data.duplicate,true);
   assert.equal(x.app.store.db.prepare('SELECT COUNT(*) n FROM photos').get().n,2);
   assert.equal((await x.create()).status,201);
+});
+
+test('public admission allows one transfer per verified client and keeps a separate owner reserve',async t=>{
+  const x=await setup(t,{maxBufferedRequests:3,trustProxy:'tailscale'});
+  const held=ip=>{const out=x.start('/conversations',{method:'POST',headers:{'Content-Type':'application/json','X-Forwarded-For':ip}});out.req.write('{');return out;};
+  const a=held('198.51.100.1');await delay(40);
+  const same=held('198.51.100.1');assert.equal((await same.result).status,503);
+  const b=held('198.51.100.2');await delay(40);
+  const excess=held('198.51.100.3');assert.equal((await excess.result).status,503);
+  const owner=await x.call('/owner/api/conversations/'+x.customer.conversationId+'/messages',{method:'POST',headers:{Origin:publicOrigin,Authorization:'Bearer '+x.ownerToken,'Content-Type':'application/json','X-Forwarded-For':'198.51.100.1'},body:JSON.stringify({operationId:randomUUID(),body:'Synthetic owner reserve'})});
+  assert.equal(owner.status,201,'The owner can work even behind the same client address as a public transfer.');
+  a.req.destroy();
+  await until(async()=>{const out=await x.call('/conversations',{method:'POST',headers:{'Content-Type':'application/json','X-Forwarded-For':'198.51.100.1'},body:JSON.stringify(input())});return out.status===201;});
+  b.req.destroy();
+});
+
+test('owner body reserve has its own cap and releases after abort and absolute deadline',async t=>{
+  const x=await setup(t,{requestDeadline:300,photoDeadline:1000});
+  const photo=multipart(256),publicHold=x.start(x.photoPath,{method:'POST',headers:{...photo.headers,Authorization:'Bearer '+x.customer.accessToken}});
+  publicHold.req.write(photo.body.subarray(0,32));
+  const pathname='/owner/api/conversations/'+x.customer.conversationId+'/messages';
+  const headers={Origin:publicOrigin,Authorization:'Bearer '+x.ownerToken,'Content-Type':'application/json'};
+  const held=()=>{const out=x.start(pathname,{method:'POST',headers});out.req.write('{');return out;};
+  const a=held();await delay(50);
+  const write=()=>x.call(pathname,{method:'POST',headers,body:JSON.stringify({operationId:randomUUID(),body:'Synthetic owner recovery'})});
+  assert.equal((await write()).status,503);a.req.destroy();
+  await until(async()=>{const out=await write();return out.status===201;});
+  const b=held();assert.equal((await b.result).status,408);
+  assert.equal((await write()).status,201,'Owner timeout releases its own slot while the public photo is still held.');
+  assert.equal((await x.create()).status,503);
+  publicHold.req.end(photo.body.subarray(32));assert.equal((await publicHold.result).status,201);
 });
 
 test('body slots release after malformed/oversized rejection and a disconnected partial upload',async t=>{
@@ -123,6 +164,32 @@ test('a stalled private photo response holds the shared cap until its deadline c
   assert.equal(crossOrigin.status,503);assert.equal(crossOrigin.headers['access-control-allow-origin'],undefined);
   // The receiver never reads; the absolute response deadline destroys the socket.
   await delay(700);assert.equal((await x.create()).status,201);
+});
+
+test('a stalled owner photo holds only the authenticated reserve until its absolute response deadline',async t=>{
+  const x=await setup(t,{photoDeadline:600,requestDeadline:180});
+  const photo=multipart(),saved=await x.call(x.photoPath,{method:'POST',headers:{...photo.headers,Authorization:'Bearer '+x.customer.accessToken},body:photo.body});
+  assert.equal(saved.status,201);
+  const completions=[];
+  x.server.on('request',(req,res)=>{if(req.method==='GET'&&req.url.startsWith('/owner/api/')&&req.url.includes('/photos/')){
+    const write=res.socket.write.bind(res.socket);
+    res.socket.write=(chunk,encoding,callback)=>{
+      if(typeof encoding==='function'){callback=encoding;encoding=undefined;}
+      return write(chunk,encoding,typeof callback==='function'?()=>completions.push(callback):undefined);
+    };
+  }});
+  t.after(()=>{for(const complete of completions)complete();});
+  const socket=net.connect({host:'127.0.0.1',port:x.port,readableHighWaterMark:1024});socket.on('error',()=>{});t.after(()=>socket.destroy());
+  await once(socket,'connect');socket.pause();
+  socket.write('GET /owner/api'+x.photoPath+'/'+saved.data.photo.id+' HTTP/1.1\r\nHost: gutters.example.invalid\r\nOrigin: '+publicOrigin+'\r\nAuthorization: Bearer '+x.ownerToken+'\r\n\r\n');
+  await delay(60);
+  const pathname='/owner/api/conversations/'+x.customer.conversationId+'/messages';
+  const headers={Origin:publicOrigin,Authorization:'Bearer '+x.ownerToken,'Content-Type':'application/json'};
+  const write=()=>x.call(pathname,{method:'POST',headers,body:JSON.stringify({operationId:randomUUID(),body:'Synthetic after owner photo'})});
+  assert.equal((await write()).status,503);
+  assert.equal((await x.create()).status,201,'A stalled owner photo does not consume the public slot.');
+  await delay(650);
+  assert.equal((await write()).status,201);
 });
 
 test('normalized API paths require verified proxy identity while health and owner page stay probeable',async t=>{

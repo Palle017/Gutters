@@ -97,7 +97,10 @@ export function createApp({dbPath,ownerToken,publicOrigin,allowedOrigins=[],now=
       return result(request,status,{ok:false,error:code},status===429?{'Retry-After':'60'}:{});
     }
   }
-  return {fetch,store,close:()=>store.close()};
+  // The transport checks the same bearer/origin policy before granting its
+  // reserved owner transfer slot. It never receives or duplicates the key.
+  const isOwnerAuthorized=request=>{try{requireOwner(request);return true;}catch{return false;}};
+  return {fetch,store,isOwnerAuthorized,close:()=>store.close()};
 }
 function after(url) {
   const value=url.searchParams.get('after')||'0';
