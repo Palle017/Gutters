@@ -1,0 +1,29 @@
+[Unit]
+Description=Gutters website messages (SQLite)
+After=network.target
+
+[Service]
+Type=simple
+User=gutters
+Group=gutters
+WorkingDirectory=/opt/gutters/current/server
+EnvironmentFile=/etc/gutters/gutters.env
+ExecStart=/usr/bin/node /opt/gutters/current/server/src/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gutters
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=256M
+TasksMax=64
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target
