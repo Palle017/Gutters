@@ -1,0 +1,13 @@
+{
+  "name": "everything-screen-and-gutters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test",
+    "build": "node tools/build.mjs",
+    "preview": "node tools/preview.mjs"
+  },
+  "devDependencies": { "jsdom": "30.1.1" }
+}
