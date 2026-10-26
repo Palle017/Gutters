@@ -75,8 +75,9 @@ export function createApp({dbPath,ownerToken,publicOrigin,allowedOrigins=[],now=
         const key=sha(clientKey(request));
         store.rate('request:'+key,240);
         if(path==='/conversations'&&request.method==='POST') {
+          const data=validateCreate(await body(request));
           store.rate('create:'+key,12);store.rate('create-global',120);
-          return result(request,201,store.create(validateCreate(await body(request))));
+          return result(request,201,store.create(data));
         }
         const match=path.match(/^\/conversations\/([a-f0-9-]{36})(?:\/(messages|operations|photos)(?:\/([a-f0-9-]{36}))?)?$/);
         if(!match||!UUID.test(match[1])||match[3]&&!UUID.test(match[3]))throw fail(404,'route_unavailable');

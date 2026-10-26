@@ -3,7 +3,7 @@ const KEY = /^[A-Za-z0-9_-]{43}$/;
 // Public customer pages stay on GitHub Pages; the private service runs on Ubuntu.
 // This is a public service address, never a credential or a customer return link.
 const LIVE_API_ORIGIN = 'https://serv2-linux.tail68bd87.ts.net:8443';
-const API_ORIGIN = ['https://wisdomscreen.pro', 'https://www.wisdomscreen.pro'].includes(location.origin) ? LIVE_API_ORIGIN : '';
+const API_ORIGIN = location.origin === 'https://wisdomscreen.pro' ? LIVE_API_ORIGIN : '';
 
 export function serviceURL(path) {
   if (typeof path !== 'string' || !/^\/(?:healthz$|conversations(?:\/|$))/.test(path) || path.includes('\\')) throw new Error('Invalid request-service path.');
@@ -56,6 +56,8 @@ const ERROR_TEXT = {
   invalid_filename: 'Please use a photo filename up to 150 characters, with a matching .jpg, .jpeg, .png, or .webp extension.',
   empty_photo: 'This photo is empty. Choose the original image file and try again.',
   storage_unavailable: 'The service could not confirm a save. Please retry; the same request will be used.',
+  service_busy: 'The service is handling other photos. Wait a few seconds, then retry. Your request details are kept.',
+  request_timeout: 'The connection took too long. Retry safely using the same request. Your request details are kept.',
   route_unavailable: 'The online request service is not available at this address yet. Please call or text John at (239) 355-3686.'
 };
 

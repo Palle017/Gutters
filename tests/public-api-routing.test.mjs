@@ -10,6 +10,19 @@ import {createApp} from '../server/src/app.mjs';
 const website = 'https://wisdomscreen.pro';
 const service = 'https://serv2-linux.tail68bd87.ts.net:8443';
 const source = (await readFile(new URL('../site/js/request-api.js', import.meta.url), 'utf8')).replace(/^export /gm, '');
+const deployment = JSON.parse(await readFile(new URL('../server/deploy/public-service.json', import.meta.url), 'utf8'));
+
+test('the reviewed deployment origin and public website routing agree', () => {
+  const dom = new JSDOM('', {url: deployment.websiteOrigin + '/estimate.html', runScripts: 'outside-only'});
+  dom.window.eval(source);
+  try {assert.equal(dom.window.serviceURL('/healthz'), deployment.apiOrigin + '/healthz');}
+  finally {dom.window.close();}
+  // GitHub redirects www to the canonical apex before serving these scripts.
+  const www = new JSDOM('', {url: 'https://www.wisdomscreen.pro/estimate.html', runScripts: 'outside-only'});
+  www.window.eval(source);
+  try {assert.equal(www.window.serviceURL('/healthz'), '/healthz');}
+  finally {www.window.close();}
+});
 
 test('Pages customer helpers reach the separate service with exact-origin CORS and keep private links on the website', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'gutters-public-route-'));

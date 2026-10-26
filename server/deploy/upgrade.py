@@ -5,7 +5,7 @@ Run as root on Ubuntu with a reviewed server-only Git archive. No public ingress
 firewall, DNS, user, or systemd-unit changes are made by this script.
 """
 import argparse
-from contextlib import closing
+from contextlib import closing, contextmanager
 import datetime
 import hashlib
 import json
@@ -13,6 +13,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import signal
 import sqlite3
 import stat
 import subprocess
@@ -27,6 +28,8 @@ DATA = Path('/var/lib/gutters')
 ENVIRONMENT = Path('/etc/gutters/gutters.env')
 DATABASE = DATA / 'gutters.sqlite3'
 SERVICE = 'gutters.service'
+PROC_ROOT = Path('/proc')
+SPACE_RESERVE = 512 * 1024 * 1024
 CONFIG_KEYS = {'GUTTERS_PUBLIC_ORIGIN', 'GUTTERS_ALLOWED_ORIGINS',
                'GUTTERS_SERVE_SITE', 'GUTTERS_TRUST_PROXY'}
 
@@ -82,12 +85,18 @@ def changed_environment(raw, replacements):
     return updated
 
 
-def archive_files(archive, expected_digest):
-    require(hashlib.sha256(archive.read_bytes()).hexdigest() == expected_digest,
+def archive_files(archive, expected_digest, expected_commit):
+    digest = hashlib.sha256()
+    with archive.open('rb') as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b''):
+            digest.update(chunk)
+    require(digest.hexdigest() == expected_digest,
             'Source archive digest mismatch.')
     files = {}
     total = 0
     with tarfile.open(archive, 'r:') as bundle:
+        require(bundle.pax_headers.get('comment') == expected_commit,
+                'Git archive commit does not match the reviewed commit.')
         members = bundle.getmembers()
         require(len(members) <= 1000, 'Too many source archive members.')
         names = set()
@@ -110,9 +119,39 @@ def archive_files(archive, expected_digest):
                 require(total <= 20_000_000, 'Source archive is too large.')
                 files[str(path)] = bundle.extractfile(member).read()
     required = {'server/package.json', 'server/src/server.mjs', 'server/src/app.mjs',
-                'server/src/store.mjs', 'server/src/protocol.mjs', 'server/src/owner-ui.mjs'}
+                'server/src/store.mjs', 'server/src/protocol.mjs', 'server/src/owner-ui.mjs',
+                'server/deploy/public-service.json'}
     require(required <= files.keys(), 'The source archive is incomplete.')
     return files
+
+
+def validate_origin_contract(files, public_origin, allowed_origin):
+    try:
+        contract = json.loads(files['server/deploy/public-service.json'])
+    except (KeyError, ValueError):
+        raise RuntimeError('The reviewed public-service origin contract is missing or invalid.') from None
+    require(set(contract) == {'apiOrigin', 'websiteOrigin'}
+            and contract['apiOrigin'] == public_origin
+            and contract['websiteOrigin'] == allowed_origin,
+            'Deployment origins do not match the reviewed frontend/backend contract.')
+
+
+def require_free_space(database, releases, source_bytes):
+    with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as connection:
+        logical = (connection.execute('PRAGMA page_count').fetchone()[0]
+                   * connection.execute('PRAGMA page_size').fetchone()[0])
+    wal = database.with_name(database.name + '-wal')
+    logical = max(logical, database.stat().st_size) + (wal.stat().st_size if wal.exists() else 0)
+    # Backup + probe + migration/WAL headroom; preserve free space for accepted writes.
+    budgets = {}
+    for path, needed in ((database.parent, 3 * logical), (releases, source_bytes)):
+        device = path.stat().st_dev
+        entry = budgets.setdefault(device, {'path': path, 'bytes': SPACE_RESERVE})
+        entry['bytes'] += needed
+    for entry in budgets.values():
+        require(shutil.disk_usage(entry['path']).free >= entry['bytes'],
+                'Insufficient disk space for the verified backup, probe, source and safety reserve.')
+    return {str(entry['path']): entry['bytes'] for entry in budgets.values()}
 
 
 def stage_release(release, files):
@@ -170,6 +209,14 @@ def online_backup(source, destination):
     return database_snapshot(destination)
 
 
+def sync_directory(path):
+    directory = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 def atomic_write(destination, content, mode=0o600):
     temporary = destination.with_name(destination.name + '.new-' + uuid.uuid4().hex)
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
@@ -178,22 +225,39 @@ def atomic_write(destination, content, mode=0o600):
         output.flush()
         os.fsync(output.fileno())
     os.replace(temporary, destination)
-    directory = os.open(destination.parent, os.O_RDONLY)
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)
+    sync_directory(destination.parent)
 
 
 def switch_release(target):
     temporary = BASE / ('current.new-' + uuid.uuid4().hex)
     temporary.symlink_to(target, target_is_directory=True)
     os.replace(temporary, BASE / 'current')
-    directory = os.open(BASE, os.O_RDONLY)
+    sync_directory(BASE)
+
+
+def current_release():
+    return (BASE / 'current').resolve(strict=True)
+
+
+class UpgradeInterrupted(RuntimeError):
+    pass
+
+
+@contextmanager
+def interruption_guard(ignore=False):
+    """Make normal SSH/termination interruptions recoverable; SIGKILL cannot be handled."""
+    previous = {}
+    def interrupt(_number, _frame):
+        raise UpgradeInterrupted('Upgrade interrupted by a termination signal.')
     try:
-        os.fsync(directory)
+        for name in ('SIGHUP', 'SIGTERM', 'SIGINT'):
+            number = getattr(signal, name, None)
+            if number is not None:
+                previous[number] = signal.signal(number, signal.SIG_IGN if ignore else interrupt)
+        yield
     finally:
-        os.close(directory)
+        for number, handler in previous.items():
+            signal.signal(number, handler)
 
 
 def health():
@@ -208,6 +272,72 @@ def health():
             pass
         time.sleep(0.2)
     raise RuntimeError('Gutters health readback failed.')
+
+
+def verify_running_release(release):
+    require(subprocess.run(['systemctl', 'is-active', '--quiet', SERVICE]).returncode == 0,
+            'The upgraded service is not active.')
+    value = subprocess.check_output(['systemctl', 'show', SERVICE, '--property=MainPID', '--value'],
+                                    text=True).strip()
+    require(value.isdecimal() and int(value) > 1, 'The upgraded service has no live main PID.')
+    process = PROC_ROOT / value
+    require(Path(os.readlink(process / 'cwd')).resolve() == (release / 'server').resolve(),
+            'The running service working directory is not the expected release.')
+    require(Path(os.readlink(process / 'exe')).resolve() == Path('/usr/bin/node').resolve(),
+            'The service main process is not the expected Node executable.')
+    arguments = (process / 'cmdline').read_bytes().split(b'\0')
+    require(arguments[:2] == [b'/usr/bin/node', b'/opt/gutters/current/server/src/server.mjs']
+            and not any(arguments[2:]), 'The running service command is unexpected.')
+    require(current_release() == release.resolve(),
+            'The active source pointer does not match the running release.')
+    return int(value)
+
+
+def apply_update(old_release, release, old_env, new_env, receipt, before, backup_dir):
+    require(ENVIRONMENT.read_bytes() == old_env, 'Configuration changed during preparation; nothing switched.')
+    require(current_release() == old_release.resolve(),
+            'The active release changed during preparation; nothing switched.')
+    receipt_path = backup_dir / 'upgrade-receipt.json'
+    receipt.update(state='prepared')
+    atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
+    try:
+        atomic_write(ENVIRONMENT, new_env)
+        switch_release(release)
+        subprocess.run(['systemctl', 'restart', SERVICE], check=True)
+        health()
+        pid = verify_running_release(release)
+        current = database_snapshot(DATABASE)
+        require(all(current.get(name, {}).get('rows', -1) >= signature['rows']
+                    for name, signature in before.items() if name != 'rate_limits'),
+                'A business-table row count decreased during upgrade.')
+        require(environment_values(ENVIRONMENT.read_bytes()).get('GUTTERS_OWNER_TOKEN')
+                == environment_values(old_env).get('GUTTERS_OWNER_TOKEN'),
+                'The existing owner key changed.')
+        receipt.update(state='running', running_pid=pid, active_source_commit=release.name,
+                       tables={name: entry['rows'] for name, entry in current.items()})
+        atomic_write(DATA / 'deployment.json', (json.dumps(receipt, indent=2) + '\n').encode())
+        atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
+    except BaseException:
+        # Never restore the database: writes accepted during deployment remain durable.
+        # A second normal termination signal must not interrupt recovery midway.
+        with interruption_guard(ignore=True):
+            atomic_write(ENVIRONMENT, old_env)
+            switch_release(old_release)
+            subprocess.run(['systemctl', 'restart', SERVICE], check=True)
+            health()
+            restored_pid = verify_running_release(old_release)
+            receipt.update(state='rolled_back', database_restored=False, running_pid=restored_pid,
+                           attempted_source_commit=receipt['source_commit'],
+                           source_commit=old_release.name, active_source_commit=old_release.name,
+                           attempted_public_origin=receipt.get('public_origin'),
+                           public_origin=environment_values(old_env).get('GUTTERS_PUBLIC_ORIGIN'),
+                           allowed_origin=environment_values(old_env).get('GUTTERS_ALLOWED_ORIGINS'),
+                           attempted_proxy_mode=receipt.get('proxy_mode'),
+                           proxy_mode=environment_values(old_env).get('GUTTERS_TRUST_PROXY', 'false'))
+            atomic_write(DATA / 'deployment.json', (json.dumps(receipt, indent=2) + '\n').encode())
+            atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
+        raise RuntimeError('Upgrade failed; prior code/configuration restored, database preserved. Inspect the private receipt.') from None
+    return receipt
 
 
 def private_path(path, uid, mode, directory=False):
@@ -227,7 +357,11 @@ def run(args):
     public_origin = canonical_https(args.public_origin)
     allowed_origin = canonical_https(args.allowed_origin)
     require(allowed_origin == 'https://wisdomscreen.pro', 'Unexpected public website origin.')
-    lock = open('/run/lock/gutters-upgrade.lock', 'a')
+    lock = os.open('/run/lock/gutters-upgrade.lock',
+                   os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    lock_info = os.fstat(lock)
+    require(lock_info.st_uid == 0 and stat.S_ISREG(lock_info.st_mode)
+            and stat.S_IMODE(lock_info.st_mode) == 0o600, 'Unexpected upgrade lock ownership or mode.')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     account = pwd.getpwnam('gutters')
     private_path(DATA, account.pw_uid, 0o700, directory=True)
@@ -258,11 +392,14 @@ def run(args):
             and values.get('GUTTERS_PORT') == '18965'
             and values.get('GUTTERS_DB_PATH') == str(DATABASE),
             'The existing listener or database path is unexpected.')
+    require(args.proxy_mode in ('false', 'tailscale'), 'Unexpected proxy trust mode.')
     replacements = {'GUTTERS_PUBLIC_ORIGIN': public_origin,
                     'GUTTERS_ALLOWED_ORIGINS': allowed_origin,
-                    'GUTTERS_SERVE_SITE': 'false', 'GUTTERS_TRUST_PROXY': 'false'}
+                    'GUTTERS_SERVE_SITE': 'false', 'GUTTERS_TRUST_PROXY': args.proxy_mode}
     new_env = changed_environment(old_env, replacements)
-    files = archive_files(Path(args.archive).resolve(strict=True), args.sha256)
+    files = archive_files(Path(args.archive).resolve(strict=True), args.sha256, args.commit)
+    validate_origin_contract(files, public_origin, allowed_origin)
+    space_budget = require_free_space(DATABASE, releases, sum(map(len, files.values())))
     release = releases / args.commit
     require(release != old_release, 'This release is already active; verify it instead of upgrading again.')
     stage_release(release, files)
@@ -313,30 +450,13 @@ def run(args):
                'backup_verified': True, 'migration_preserved_existing_rows': True,
                'database': str(DATABASE), 'owner_key_preserved': True,
                'public_origin': public_origin, 'allowed_origin': allowed_origin,
+               'proxy_mode': args.proxy_mode, 'space_budget_bytes': space_budget,
                'public_route_created': False, 'switched_at': timestamp}
-    try:
-        atomic_write(ENVIRONMENT, new_env)
-        switch_release(release)
-        subprocess.run(['systemctl', 'restart', SERVICE], check=True)
-        health()
-        current = database_snapshot(DATABASE)
-        require(all(current.get(name, {}).get('rows', -1) >= signature['rows']
-                    for name, signature in before.items() if name != 'rate_limits'),
-                'A business-table row count decreased during upgrade.')
-        require(environment_values(ENVIRONMENT.read_bytes()).get('GUTTERS_OWNER_TOKEN') == values['GUTTERS_OWNER_TOKEN'],
-                'The existing owner key changed.')
-        receipt.update(state='running', tables={name: entry['rows'] for name, entry in current.items()})
-        atomic_write(DATA / 'deployment.json', (json.dumps(receipt, indent=2) + '\n').encode())
-    except Exception:
-        # Never restore the database: writes accepted during deployment remain durable.
-        atomic_write(ENVIRONMENT, old_env)
-        switch_release(old_release)
-        subprocess.run(['systemctl', 'restart', SERVICE], check=True)
-        health()
-        receipt.update(state='rolled_back', database_restored=False)
-        atomic_write(backup_dir / 'upgrade-receipt.json', (json.dumps(receipt, indent=2) + '\n').encode())
-        raise RuntimeError('Upgrade failed; prior code/configuration restored, database preserved. Inspect the private receipt.') from None
-    atomic_write(backup_dir / 'upgrade-receipt.json', (json.dumps(receipt, indent=2) + '\n').encode())
+    # Refresh the safety margin after copying the backup/probe and before changing service state.
+    for path in (DATA, releases):
+        require(shutil.disk_usage(path).free >= SPACE_RESERVE,
+                'Disk safety reserve fell below the required margin during preparation.')
+    apply_update(old_release, release, old_env, new_env, receipt, before, backup_dir)
     print(json.dumps(receipt, indent=2))
 
 
@@ -347,8 +467,10 @@ if __name__ == '__main__':
     parser.add_argument('--sha256', required=True)
     parser.add_argument('--public-origin', required=True)
     parser.add_argument('--allowed-origin', default='https://wisdomscreen.pro')
+    parser.add_argument('--proxy-mode', choices=('false', 'tailscale'), default='false')
     try:
-        run(parser.parse_args())
+        with interruption_guard():
+            run(parser.parse_args())
     except Exception as error:
         # Only deliberate, sanitized messages escape; subprocess output can contain runtime data.
         print(json.dumps({'ok': False, 'error': str(error) if isinstance(error, RuntimeError)

@@ -111,6 +111,20 @@ test('rate limits bound anonymous creation and bad owner keys without exposing c
   for(let i=0;i<30;i++)assert.equal((await x.call('/owner/api/conversations',{origin:ownerOrigin})).status,401);
   assert.equal((await x.call('/owner/api/conversations',{origin:ownerOrigin})).status,429);assert.equal((await x.call('/owner/api/conversations',{owner:true})).status,200);
 });
+test('malformed requests do not consume the shared successful-create budget',async t=>{
+  const x=setup(t,{clock:{value:Date.UTC(2026,9,26,12)}});
+  for(let i=0;i<125;i++)assert.equal((await x.call('/conversations',{method:'POST',body:{},headers:{'x-test-ip':'203.0.113.'+(i%100+1)}})).status,400);
+  assert.equal((await x.call('/conversations',{method:'POST',body:input(),headers:{'x-test-ip':'198.51.100.1'}})).status,201);
+  assert.equal(x.app.store.db.prepare('SELECT COUNT(*) n FROM conversations').get().n,1);
+});
+
+test('a client at its create limit does not block an independent customer',async t=>{
+  const x=setup(t,{clock:{value:Date.UTC(2026,9,26,12)}}),headers={'x-test-ip':'203.0.113.10'};
+  for(let i=0;i<12;i++)assert.equal((await x.call('/conversations',{method:'POST',body:input(),headers})).status,201);
+  assert.equal((await x.call('/conversations',{method:'POST',body:input(),headers})).status,429);
+  assert.equal((await x.call('/conversations',{method:'POST',body:input(),headers:{'x-test-ip':'203.0.113.11'}})).status,201);
+});
+
 test('quote owner edits affect only the four fields, leaving initial snapshot and messages unchanged',async t=>{
   const x=setup(t),request=input();await x.call('/conversations',{method:'POST',body:request});
   const quote={address:'Synthetic project',size_of_home:'John measured: pending unit',stories:1,gutter_length:'TBD after quote'};

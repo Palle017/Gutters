@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""Verify the real public Gutters request/estimate API with two synthetic records.
+"""Exercise the configured Gutters HTTPS API with two synthetic records.
 
 Run on Ubuntu as root after the public HTTPS route and reviewed service are live:
   sudo python3 server/deploy/public_acceptance.py create
   sudo systemctl restart gutters.service
   sudo python3 server/deploy/public_acceptance.py verify
+  # Independently verify the customer workflow from outside the tailnet first.
+  sudo python3 server/deploy/public_acceptance.py cleanup
 
 Use `resume` after an uncertain create run. `create` also resumes an existing run.
 All six mutation identities are saved before the first request. The owner key is
 read from the protected environment file, never printed or stored in this state.
 State stays root-owned and mode 0600 at /var/lib/gutters/public-acceptance-access.json.
-No delete, live-database restore, external notification or route mutation occurs.
+Cleanup revokes only the two saved, identity-checked synthetic capabilities. It
+retains their labeled records and this private evidence; repeat cleanup after an
+uncertain acknowledgement. No delete, live-database restore, external notification
+or route mutation occurs. Running on Ubuntu or a tailnet client does not prove
+that customers outside the tailnet can reach the endpoint or use the browser flow.
 """
 import argparse
 import base64
@@ -138,10 +144,15 @@ def save_state(state, *, exclusive=False):
     private_file(STATE_PATH)
 
 
+def synthetic_intake(label):
+    require(label in ('A', 'B'), 'invalid_synthetic_label')
+    return {'name': 'SYNTHETIC PUBLIC ACCEPTANCE ' + label,
+            'phone': '2395550101' if label == 'A' else '2395550102',
+            'details': 'SYNTHETIC deployment verification only. Not a customer job. No contact or work requested.'}
+
+
 def new_payload(label):
-    intake = {'name': 'SYNTHETIC PUBLIC ACCEPTANCE ' + label,
-              'phone': '2395550101' if label == 'A' else '2395550102',
-              'details': 'SYNTHETIC deployment verification only. Not a customer job. No contact or work requested.'}
+    intake = synthetic_intake(label)
     return {'schemaVersion': 2, 'conversationId': str(uuid.uuid4()), 'operationId': str(uuid.uuid4()),
             'accessToken': secrets.token_urlsafe(32), 'intake': intake,
             'answers': [{'field': field, 'state': 'provided', 'answer': intake[field]} if field in intake
@@ -166,19 +177,30 @@ def load_state(origin, mode):
     state = json.loads(STATE_PATH.read_text(encoding='utf-8'))
     require(state.get('version') == 1 and state.get('origin') == origin
             and state.get('websiteOrigin') == WEBSITE_ORIGIN, 'acceptance_state_origin_mismatch')
+    require(set(state.get('records', {})) == {'A', 'B'}, 'invalid_synthetic_record_set')
     for label in ('A', 'B'):
         payload = state.get('records', {}).get(label, {})
         require(bool(UUID.fullmatch(payload.get('conversationId', '')))
                 and bool(UUID.fullmatch(payload.get('operationId', '')))
                 and bool(CAPABILITY.fullmatch(payload.get('accessToken', '')))
-                and payload.get('intake', {}).get('name', '').startswith('SYNTHETIC PUBLIC ACCEPTANCE '),
+                and payload.get('intake') == synthetic_intake(label),
                 'invalid_synthetic_identity')
+    require(len({record['conversationId'] for record in state['records'].values()}) == 2
+            and len({record['accessToken'] for record in state['records'].values()}) == 2,
+            'synthetic_identities_not_distinct')
     for key in ('photo', 'draft', 'publish', 'reply', 'crossCustomerReply'):
         require(bool(UUID.fullmatch(state.get(key, {}).get('operationId', ''))), 'invalid_saved_operation')
     require(state['photo']['sha256'] == digest(PNG), 'synthetic_photo_changed')
     if mode == 'verify':
         require(state.get('completed') and state.get('baseline'), 'acceptance_not_complete_use_resume')
+    require(mode == 'cleanup' or not state.get('cleanup'), 'cleanup_started_use_cleanup_only')
     return state
+
+
+def reachability_scope():
+    return {'verification_scope': 'Configured HTTPS API checks from the executing host only.',
+            'independent_public_reachability_verified': False,
+            'requires_independent_non_tailnet_verification': True}
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -398,7 +420,79 @@ class PublicChecks:
         self.publish(replay)
         self.reply(replay)
 
+    def cleanup(self):
+        self.stage = 'synthetic_cleanup_identity_preflight'
+        owners = {}
+        snapshots = {}
+        # Validate BOTH targets before any revocation. Never select by a name search.
+        for label in ('A', 'B'):
+            payload = self.payload(label)
+            require(payload.get('intake') == synthetic_intake(label), 'cleanup_saved_identity_mismatch')
+            owner = self.owner(label)
+            conversation = owner.get('conversation', {})
+            repair = conversation.get('repair', {})
+            require(conversation.get('id') == payload['conversationId']
+                    and all(repair.get(field) == value for field, value in synthetic_intake(label).items()),
+                    'cleanup_owner_identity_mismatch')
+            initial = [message for message in owner.get('messages', [])
+                       if message.get('operationId') == payload['operationId']]
+            require(len(initial) == 6
+                    and [message.get('body') for message in initial if message.get('role') == 'customer']
+                    == list(synthetic_intake(label).values()), 'cleanup_initial_operation_mismatch')
+            receipt, _ = self.request('/owner/api' + self.route(label) + '/operations/' + payload['operationId'], owner=True)
+            saved = receipt.get('receipt', {})
+            require(saved.get('operationId') == payload['operationId']
+                    and saved.get('messageId') == initial[-1].get('id')
+                    and saved.get('sequence') == initial[-1].get('sequence'), 'cleanup_initial_receipt_mismatch')
+            previous = self.state['receipts'].get('create' + label)
+            require(previous is None or previous == saved, 'cleanup_saved_receipt_mismatch')
+            require(isinstance(owner.get('guestAccess', {}).get('revoked'), bool), 'cleanup_guest_status_missing')
+            owners[label] = owner
+            snapshots[label] = digest({key: value for key, value in owner.items() if key != 'guestAccess'})
+        cleanup = self.state.get('cleanup')
+        if cleanup is None:
+            cleanup = {'version': 1, 'startedAt': now(), 'ownerSnapshotSha256': snapshots, 'revoked': {}}
+            self.state['cleanup'] = cleanup
+            save_state(self.state)
+        require(cleanup.get('version') == 1 and cleanup.get('ownerSnapshotSha256') == snapshots,
+                'cleanup_retained_records_changed')
+        for label in ('A', 'B'):
+            self.stage = 'synthetic_cleanup_revoke_' + label.lower()
+            if not owners[label]['guestAccess']['revoked']:
+                # The owner endpoint uses COALESCE(revoked_at,...), so an uncertain
+                # retry is idempotent. Readback on the next run avoids reposting.
+                self.request('/owner/api' + self.route(label) + '/revoke', method='POST', body={}, owner=True)
+            owner = self.owner(label)
+            require(owner.get('guestAccess', {}).get('revoked') is True
+                    and owner['guestAccess'].get('active') is False, 'synthetic_revoke_not_read_back')
+            require(digest({key: value for key, value in owner.items() if key != 'guestAccess'}) == snapshots[label],
+                    'cleanup_changed_retained_records')
+            for path, options in ((self.route(label), {}),
+                                  (self.route(label) + '/messages', {'method': 'POST', 'body': self.state['crossCustomerReply']})):
+                denied, _ = self.request(path, token=self.payload(label)['accessToken'], expected=(410,), **options)
+                require(denied.get('ok') is False and denied.get('error') == 'access_expired',
+                        'revoked_customer_access_not_denied')
+            if label == 'A' and self.state.get('photoId'):
+                denied, _ = self.request(self.route(label) + '/photos/' + self.state['photoId'],
+                                         token=self.payload(label)['accessToken'], expected=(410,))
+                require(denied.get('ok') is False and denied.get('error') == 'access_expired',
+                        'revoked_photo_access_not_denied')
+                photo, _ = self.request('/owner/api' + self.route(label) + '/photos/' + self.state['photoId'],
+                                        owner=True, binary=True)
+                require(digest(photo) == self.state['photo']['sha256'], 'cleanup_owner_photo_changed')
+            cleanup['revoked'][label] = True
+            save_state(self.state)
+        cleanup['completedAt'] = now()
+        save_state(self.state)
+        return {'ok': True, 'mode': 'cleanup', 'checked_at': cleanup['completedAt'],
+                'configured_https_api_origin': self.origin, 'synthetic_accesses_revoked': 2,
+                'synthetic_records_retained': True, 'owner_snapshots_unchanged': True,
+                'private_state_retained': True, 'revoked_guest_reads_and_writes_denied': True,
+                'retained_owner_snapshot_sha256': digest(snapshots), **reachability_scope()}
+
     def run(self, mode):
+        if mode == 'cleanup':
+            return self.cleanup()
         if mode == 'verify':
             require(self.snapshot() == self.state['baseline'], 'pre_retry_durable_snapshot_changed')
         else:
@@ -417,14 +511,14 @@ class PublicChecks:
         self.state['verifiedAt'] = now()
         save_state(self.state)
         return {'ok': True, 'mode': mode, 'checked_at': self.state['verifiedAt'],
-                'public_api_origin': self.origin, 'checks': self.state['checks'],
+                'configured_https_api_origin': self.origin, 'checks': self.state['checks'],
                 'exact_retries_unchanged': True, **actual,
-                'restart_survival_verified': mode == 'verify'}
+                'restart_survival_verified': mode == 'verify', **reachability_scope()}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('create', 'resume', 'verify'))
+    parser.add_argument('mode', choices=('create', 'resume', 'verify', 'cleanup'))
     args = parser.parse_args()
     checker = None
     try:
@@ -435,7 +529,7 @@ def main():
         if args.mode == 'verify':
             require(state.get('serviceAtStart') and state['serviceAtStart'] != current_service,
                     'service_restart_not_observed')
-        elif not state.get('serviceAtStart'):
+        elif args.mode != 'cleanup' and not state.get('serviceAtStart'):
             state['serviceAtStart'] = current_service
             save_state(state)
         checker = PublicChecks(origin, owner_key, state)
@@ -445,7 +539,10 @@ def main():
         # Do not print request/response bodies, URLs with IDs, headers or exception messages.
         code = str(error) if isinstance(error, AcceptanceFailure) else type(error).__name__
         print(json.dumps({'ok': False, 'stage': checker.stage if checker else 'preflight', 'error': code,
-                          'retry': 'Use resume with the original private state; do not replace it.'}))
+                          'retry': ('Repeat cleanup with the original private state; do not replace it.'
+                                    if args.mode == 'cleanup' or code == 'cleanup_started_use_cleanup_only'
+                                    else 'Use resume with the original private state; do not replace it.'),
+                          **reachability_scope()}))
         return 1
 
 
