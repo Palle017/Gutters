@@ -1,4 +1,4 @@
-import {validAccess, readSession, saveSession, removeSession, rememberAccess, newId, api, requireReceipt, readConversation, copyPrivateLink} from './request-api.js';
+import {validAccess, readSession, saveSession, removeSession, rememberAccess, newId, api, requireReceipt, readConversation, serviceAvailable, copyPrivateLink} from './request-api.js';
 
 const status = document.querySelector('#customer-status');
 const content = document.querySelector('#customer-content');
@@ -138,5 +138,11 @@ if (pendingMessage) {
 }
 if (!access) {
   content.hidden = true; document.querySelector('#no-access').hidden = false; refreshButton.disabled = true; copyButton.disabled = true; setStatus(accessError || 'A private request link is needed to open this page.', true);
-} else refresh().catch(() => {});
+} else serviceAvailable().then(available => {
+  if (available) return refresh().catch(() => {});
+  content.hidden = true; refreshButton.disabled = true; sendButton.disabled = true;
+  document.querySelector('#request-reference').textContent = 'Private request unavailable';
+  document.querySelector('#service-notice').hidden = false;
+  setStatus('The online request service is not available right now. Please call, text or email John.', true);
+});
 window.addEventListener('pagehide', () => { for (const url of imageURLs) URL.revokeObjectURL(url); });

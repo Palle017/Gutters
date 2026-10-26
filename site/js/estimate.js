@@ -1,4 +1,4 @@
-import {REQUEST_KEY, FIELDS, MAX_PHOTOS, newId, newKey, validAccess, readSession, saveSession, rememberAccess, privateLink, api, requireReceipt, readConversation, fileHash, validateSelectedPhoto, keepPhoto, getPhoto, releasePhoto, copyPrivateLink} from './request-api.js';
+import {REQUEST_KEY, FIELDS, MAX_PHOTOS, newId, newKey, validAccess, readSession, saveSession, rememberAccess, privateLink, api, requireReceipt, readConversation, serviceAvailable, fileHash, validateSelectedPhoto, keepPhoto, getPhoto, releasePhoto, copyPrivateLink} from './request-api.js';
 
 const form = document.querySelector('#estimate-form');
 const fieldset = document.querySelector('#request-fields');
@@ -12,6 +12,7 @@ let selected = [];
 let pending = readSession(REQUEST_KEY);
 let busy = false;
 let selecting = false;
+let serviceDown = false;
 const HISTORY_KEY = 'everything-gutters.completed-requests.v2';
 if (!pending?.payload || pending.payload.schemaVersion !== 2 || !Array.isArray(pending.photos)) pending = null;
 
@@ -136,7 +137,7 @@ document.querySelector('#start-another-request').addEventListener('click', () =>
     for (const photo of selected) URL.revokeObjectURL(photo.url);
     selected = []; pending = null; form.reset(); fieldset.disabled = false; photoInput.disabled = false; if (cameraInput) cameraInput.disabled = false;
     submit.disabled = false; submit.textContent = 'Send request to John →';
-    document.querySelector('#request-success').hidden = true; document.querySelector('#request-entry').hidden = false;
+    document.querySelector('#request-success').hidden = true; document.querySelector('#request-entry').hidden = serviceDown;
     document.querySelector('#private-request-link').hidden = true; document.querySelector('#request-recovery')?.remove();
     displayPhotos(); photoMessage(''); renderPreviousRequests();
     showStatus('Ready for another project. Your earlier request and private link are listed below.');
@@ -231,3 +232,10 @@ if (pending) {
   }
 }
 renderPreviousRequests();
+serviceAvailable().then(available => {
+  if (available) return;
+  serviceDown = true;
+  document.querySelector('#request-entry').hidden = true;
+  lockSubmitted(); submit.disabled = true;
+  document.querySelector('#service-notice').hidden = false;
+});

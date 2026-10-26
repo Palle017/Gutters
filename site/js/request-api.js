@@ -73,6 +73,20 @@ export async function api(path, {method = 'GET', token, body, binary = false} = 
   } finally { clearTimeout(timer); }
 }
 
+export const SERVICE_CHECK_MS = 4000;
+// Same-origin readiness probe. Any non-OK, non-JSON, timed-out, network-failed or file: result is "unavailable".
+export async function serviceAvailable() {
+  if (location.protocol === 'file:') return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SERVICE_CHECK_MS);
+  try {
+    const response = await fetch('/healthz', {method: 'GET', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: controller.signal});
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data?.ok === true;
+  } catch { return false; } finally { clearTimeout(timer); }
+}
+
 export function requireReceipt(data, operationId) {
   if (data?.ok !== true || data.receipt?.operationId !== operationId) throw new Error('A matching save receipt was not returned. Retry to check the same request.');
   return data.receipt;
