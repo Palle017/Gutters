@@ -72,3 +72,32 @@ export function bearer(request) {
   const header=request.headers.get('authorization')||'';
   return /^Bearer [A-Za-z0-9_-]{43}$/.test(header)?header.slice(7):null;
 }
+
+export const PHOTO_MAX_BYTES=5*1024*1024;
+export const PHOTO_MAX_COUNT=6;
+export function validatePhoto({operationId,filename,mime,bytes}) {
+  if(!UUID.test(operationId))throw fail(400,'invalid_operation');
+  if(!Buffer.isBuffer(bytes)||!bytes.length)throw fail(400,'empty_photo');
+  if(bytes.length>PHOTO_MAX_BYTES)throw fail(413,'photo_too_large');
+  if(typeof filename!=='string'||filename.length>150||/[\\/\u0000-\u001f\u007f]/.test(filename))throw fail(400,'invalid_filename');
+  let detected=null;
+  if(bytes.length>=24&&bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))&&bytes.toString('ascii',12,16)==='IHDR'&&bytes.readUInt32BE(16)>0&&bytes.readUInt32BE(20)>0&&bytes.length>=45&&bytes.toString('ascii',bytes.length-8,bytes.length-4)==='IEND')detected='image/png';
+  if(bytes.length>=12&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255&&bytes.at(-2)===255&&bytes.at(-1)===217)detected='image/jpeg';
+  if(bytes.length>=20&&bytes.toString('ascii',0,4)==='RIFF'&&bytes.readUInt32LE(4)+8===bytes.length&&bytes.toString('ascii',8,12)==='WEBP'&&['VP8 ','VP8L','VP8X'].includes(bytes.toString('ascii',12,16)))detected='image/webp';
+  const extensions={'image/png':/\.png$/i,'image/jpeg':/\.jpe?g$/i,'image/webp':/\.webp$/i};
+  if(!detected||mime!==detected||!extensions[detected].test(filename))throw fail(415,'unsupported_photo');
+  return {operationId,filename,mime:detected,bytes,hash:sha(JSON.stringify({filename,mime:detected,sha:sha(bytes)}))};
+}
+export function validateEstimate(input) {
+  exactKeys(input,['operationId','scope','amount','notes']);
+  if(!UUID.test(input.operationId))throw fail(400,'invalid_operation');
+  const scope=clean(input.scope,4000),notes=input.notes===undefined?'':clean(input.notes,2000,{required:false});
+  if(typeof input.amount!=='string'||!/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/.test(input.amount))throw fail(400,'invalid_amount');
+  const [whole,fraction='']=input.amount.split('.'),amount=whole+'.'+fraction.padEnd(2,'0');
+  return {operationId:input.operationId,scope,amount,notes};
+}
+export function validatePublish(input) {
+  exactKeys(input,['operationId']);
+  if(!UUID.test(input.operationId))throw fail(400,'invalid_operation');
+  return {operationId:input.operationId};
+}
