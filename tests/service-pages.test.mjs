@@ -17,6 +17,7 @@ test('every added service page is reachable, readable, and offers direct call/te
     const doc=new JSDOM(source).window.document;
     assert.ok(listing.querySelector('a[href="'+page+'"]'),'services links '+page);
     assert.equal(doc.querySelectorAll('h1').length,1);
+    assert.equal(doc.querySelector('main#main').getAttribute('tabindex'),'-1','skip-link target accepts focus');
     assert.ok(doc.querySelector('meta[name="description"]').content.length>100);
     assert.equal(titles.has(doc.title),false,'unique service title');titles.add(doc.title);
     assert.ok(doc.querySelector('a[href="tel:+12393553686"]'));
