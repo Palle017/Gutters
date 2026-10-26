@@ -76,7 +76,7 @@ deployment has matching `running` receipts in the backup folder and
 Run the updater checks independently of the JavaScript suite:
 
 ```text
-python3 -m unittest discover -s server/deploy -p test_upgrade.py
+python3 -m unittest discover -s server/deploy -p 'test_*.py'
 ```
 
 After deployment, verify the actual public customer request and photo submission,

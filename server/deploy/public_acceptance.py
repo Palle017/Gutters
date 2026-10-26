@@ -192,7 +192,8 @@ def load_state(origin, mode):
         require(bool(UUID.fullmatch(state.get(key, {}).get('operationId', ''))), 'invalid_saved_operation')
     require(state['photo']['sha256'] == digest(PNG), 'synthetic_photo_changed')
     if mode == 'verify':
-        require(state.get('completed') and state.get('baseline'), 'acceptance_not_complete_use_resume')
+        require(state.get('completed') and state.get('baseline') and state.get('serviceAtCompleted'),
+                'acceptance_not_complete_use_resume')
     require(mode == 'cleanup' or not state.get('cleanup'), 'cleanup_started_use_cleanup_only')
     return state
 
@@ -496,18 +497,26 @@ class PublicChecks:
         if mode == 'verify':
             require(self.snapshot() == self.state['baseline'], 'pre_retry_durable_snapshot_changed')
         else:
+            # An interrupted resume must not retain an earlier completion marker.
+            self.state.pop('completed', None)
+            self.state.pop('serviceAtCompleted', None)
+            save_state(self.state)
             self.mutations()
             self.security_checks()
             baseline = self.snapshot()
             previous = self.state.get('baseline')
             require(previous is None or previous == baseline, 'resumed_snapshot_changed')
             self.state['baseline'] = baseline
-            self.state['completed'] = now()
             save_state(self.state)
         self.mutations(replay=True)
         self.security_checks()
         actual = self.snapshot()
         require(actual == self.state['baseline'], 'exact_retry_changed_saved_state')
+        if mode != 'verify':
+            # Bind restart proof to the completed writes, never the start of an
+            # interrupted create that could predate a restart and later resume.
+            self.state['serviceAtCompleted'] = service_identity()
+            self.state['completed'] = now()
         self.state['verifiedAt'] = now()
         save_state(self.state)
         return {'ok': True, 'mode': mode, 'checked_at': self.state['verifiedAt'],
@@ -527,7 +536,7 @@ def main():
         state = load_state(origin, args.mode)
         current_service = service_identity()
         if args.mode == 'verify':
-            require(state.get('serviceAtStart') and state['serviceAtStart'] != current_service,
+            require(state.get('serviceAtCompleted') and state['serviceAtCompleted'] != current_service,
                     'service_restart_not_observed')
         elif args.mode != 'cleanup' and not state.get('serviceAtStart'):
             state['serviceAtStart'] = current_service
