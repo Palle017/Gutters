@@ -350,8 +350,12 @@ class UpgradeTests(unittest.TestCase):
                     db.execute('INSERT INTO retained VALUES(1, ?)', ('before',))
                     db.commit()
                 before = upgrade.database_snapshot(database)
-                old_env = b'GUTTERS_OWNER_TOKEN=' + b'A' * 43 + b'\n'
-                new_env = old_env + b'GUTTERS_TRUST_PROXY=tailscale\n'
+                old_env = (b'GUTTERS_OWNER_TOKEN=' + b'A' * 43
+                           + b'\nGUTTERS_PUBLIC_ORIGIN=https://old.example.com\n'
+                           + b'GUTTERS_ALLOWED_ORIGINS=https://old-customer.example.com\n'
+                           + b'GUTTERS_TRUST_PROXY=false\n')
+                new_env = old_env.replace(b'https://old', b'https://new').replace(
+                    b'GUTTERS_TRUST_PROXY=false', b'GUTTERS_TRUST_PROXY=tailscale')
                 environment.write_bytes(old_env)
                 old_release, release = case / 'old', case / COMMIT
                 old_release.mkdir(); release.mkdir()
@@ -401,7 +405,8 @@ class UpgradeTests(unittest.TestCase):
                 stack.enter_context(patch.object(upgrade.subprocess, 'run', side_effect=restart))
                 stack.enter_context(patch.object(upgrade, 'health', side_effect=health))
                 stack.enter_context(patch.object(upgrade, 'verify_running_release', side_effect=running))
-                receipt = {'source_commit': COMMIT}
+                receipt = {'source_commit': COMMIT, 'public_origin': 'https://new.example.com',
+                           'allowed_origin': 'https://new-customer.example.com', 'proxy_mode': 'tailscale'}
                 with self.assertRaisesRegex(RuntimeError, 'recovery failed') as caught:
                     upgrade.apply_update(old_release, release, old_env, new_env, receipt, before, backup)
                 self.assertNotIn(secret, str(caught.exception))
@@ -415,8 +420,15 @@ class UpgradeTests(unittest.TestCase):
                     self.assertEqual(saved['upgrade_failure'], 'interrupted' if failure == 'restart' else 'check_failed')
                     self.assertFalse(saved['database_restored'])
                     self.assertEqual(saved['attempted_source_commit'], COMMIT)
+                    self.assertEqual(saved['attempted_public_origin'], 'https://new.example.com')
+                    self.assertEqual(saved['attempted_allowed_origin'], 'https://new-customer.example.com')
+                    self.assertEqual(saved['attempted_proxy_mode'], 'tailscale')
                     self.assertEqual(saved['rollback_runtime_verified'], failure == 'receipt')
+                    self.assertEqual(saved['source_commit'], old_release.name if failure == 'receipt' else None)
                     self.assertEqual(saved['active_source_commit'], old_release.name if failure == 'receipt' else None)
+                    self.assertEqual(saved['public_origin'], 'https://old.example.com' if failure == 'receipt' else None)
+                    self.assertEqual(saved['allowed_origin'], 'https://old-customer.example.com' if failure == 'receipt' else None)
+                    self.assertEqual(saved['proxy_mode'], 'false' if failure == 'receipt' else None)
                 with closing(sqlite3.connect(database)) as db:
                     self.assertEqual(db.execute('SELECT value FROM retained ORDER BY id').fetchall(),
                                      [('before',), ('accepted-during-upgrade',)])

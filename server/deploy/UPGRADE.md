@@ -39,6 +39,20 @@ behind the same address does not block that owner. Admission uses the verified
 proxy identity when configured. The slot remains occupied until both application
 work and the response finish or close, including slow photo downloads.
 
+The default configuration has only one public transfer lane. One slow public
+request can occupy it until its absolute deadline, while other public clients
+receive `503` with `Retry-After: 5`. The per-client cap does not add fairness when
+there is only one public slot; it also limits each client if a larger transfer
+budget is explicitly configured. This change protects owner capacity, not
+continuous availability for every public client. Do not enlarge the budget
+without measuring Ubuntu memory first. Owner photo reads and JSON writes share
+the single owner lane, so an overlapping owner action can also receive a busy
+response and must retain its pending operation for retry.
+
+The inbox cancels a photo read after 15 seconds and offers a read-only retry.
+This shorter browser deadline is deliberate; the server's 75-second photo
+deadline remains an independent upper bound for other clients and transports.
+
 The connection ceiling remains 64, with absolute 15-second ordinary and 75-second
 photo deadlines. Excess work receives a retryable busy response; an early-closed
 upload can instead appear as a connection reset. Retrying must retain the same

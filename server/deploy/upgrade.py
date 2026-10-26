@@ -313,6 +313,12 @@ def apply_update(old_release, release, old_env, new_env, receipt, before, backup
     require(current_release() == old_release.resolve(),
             'The active release changed during preparation; nothing switched.')
     receipt_path = backup_dir / 'upgrade-receipt.json'
+    # Keep reviewed attempt metadata separate from the active-runtime fields.
+    # A later rolled_back receipt write may fail after those fields were changed.
+    attempted = {'attempted_source_commit': receipt['source_commit'],
+                 'attempted_public_origin': receipt.get('public_origin'),
+                 'attempted_allowed_origin': receipt.get('allowed_origin'),
+                 'attempted_proxy_mode': receipt.get('proxy_mode')}
     receipt.update(state='prepared')
     atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
     try:
@@ -338,6 +344,7 @@ def apply_update(old_release, release, old_env, new_env, receipt, before, backup
         with interruption_guard(ignore=True):
             recovery_step = 'restore_configuration'
             restored_pid = None
+            restored_config = None
             try:
                 atomic_write(ENVIRONMENT, old_env)
                 recovery_step = 'restore_source_pointer'
@@ -348,24 +355,26 @@ def apply_update(old_release, release, old_env, new_env, receipt, before, backup
                 health()
                 recovery_step = 'verify_previous_process'
                 restored_pid = verify_running_release(old_release)
+                restored_config = environment_values(old_env)
                 receipt.update(state='rolled_back', database_restored=False, running_pid=restored_pid,
-                               attempted_source_commit=receipt['source_commit'],
                                source_commit=old_release.name, active_source_commit=old_release.name,
-                               attempted_public_origin=receipt.get('public_origin'),
-                               public_origin=environment_values(old_env).get('GUTTERS_PUBLIC_ORIGIN'),
-                               allowed_origin=environment_values(old_env).get('GUTTERS_ALLOWED_ORIGINS'),
-                               attempted_proxy_mode=receipt.get('proxy_mode'),
-                               proxy_mode=environment_values(old_env).get('GUTTERS_TRUST_PROXY', 'false'))
+                               public_origin=restored_config.get('GUTTERS_PUBLIC_ORIGIN'),
+                               allowed_origin=restored_config.get('GUTTERS_ALLOWED_ORIGINS'),
+                               proxy_mode=restored_config.get('GUTTERS_TRUST_PROXY', 'false'), **attempted)
                 recovery_step = 'record_rollback_receipts'
                 atomic_write(DATA / 'deployment.json', (json.dumps(receipt, indent=2) + '\n').encode())
                 atomic_write(receipt_path, (json.dumps(receipt, indent=2) + '\n').encode())
             except BaseException as recovery_error:
                 receipt.update(state='rollback_failed', database_restored=False,
-                               attempted_source_commit=release.name, rollback_target_commit=old_release.name,
+                               rollback_target_commit=old_release.name,
+                               source_commit=old_release.name if restored_pid is not None else None,
                                active_source_commit=old_release.name if restored_pid is not None else None,
+                               public_origin=restored_config.get('GUTTERS_PUBLIC_ORIGIN') if restored_config is not None else None,
+                               allowed_origin=restored_config.get('GUTTERS_ALLOWED_ORIGINS') if restored_config is not None else None,
+                               proxy_mode=restored_config.get('GUTTERS_TRUST_PROXY', 'false') if restored_config is not None else None,
                                running_pid=restored_pid, rollback_runtime_verified=restored_pid is not None,
                                upgrade_failure=failure_code(upgrade_error),
-                               recovery_failure={'step': recovery_step, 'code': failure_code(recovery_error)})
+                               recovery_failure={'step': recovery_step, 'code': failure_code(recovery_error)}, **attempted)
                 # Try both independent protected receipts even if one location
                 # is unwritable. Neither a stale success receipt nor a failed
                 # recovery may be reported as a restored/running release.

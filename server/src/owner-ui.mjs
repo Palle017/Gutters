@@ -43,7 +43,7 @@ async function api(path,{method='GET',body}={}){
   const response=await fetch('/owner/api'+path,{method,headers:{Authorization:'Bearer '+key,...(body?{'Content-Type':'application/json'}:{})},credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:sessionAbort.signal,...(body?{body:JSON.stringify(body)}:{})});
   let data;try{data=await response.json();}catch{throw Error('The saved result could not be confirmed.');}
   if(epoch!==sessionVersion||token!==key)throw Error('The inbox is locked.');
-  if(!response.ok||data?.ok!==true){const error=Error(response.status===401?'The owner access key was not accepted.':response.status===429?'Please wait a minute and try again.':response.status===409?'That pending operation conflicts with an earlier saved operation.':'The request could not be completed.');error.status=response.status;throw error;}
+  if(!response.ok||data?.ok!==true){const error=Error(response.status===401?'The owner access key was not accepted.':response.status===503?(pending||pendingEstimate?'The service is busy. Wait a few seconds, then retry the same pending action. Its original details are kept.':'The service is busy. Wait a few seconds, then refresh or retry.'):response.status===429?'Please wait a minute and try again.':response.status===409?'That pending operation conflicts with an earlier saved operation.':'The request could not be completed.');error.status=response.status;throw error;}
   return data;
 }
 function clearPhotos(){photoAbort.abort();photoAbort=new AbortController();photoLoading=false;photoRows=[];for(const value of photoURLs.values())URL.revokeObjectURL(value);photoURLs.clear();photoConversation=null;$('photos').replaceChildren();$('photo-status').textContent='';$('retry-photos').hidden=true;}
@@ -71,6 +71,7 @@ async function showPhotos(rows){
     for(const photo of rows){
       let src=photoURLs.get(photo.id);
       if(!src){
+        // Bound this display-only read; retry is explicit and core request details stay usable.
         const timer=setTimeout(()=>controller.abort(),15000);
         try{
           const response=await fetch('/owner/api/conversations/'+id+'/photos/'+photo.id,{headers:{Authorization:'Bearer '+token},credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal});
@@ -135,7 +136,7 @@ async function sendPending(){
   catch(error){if(error.status!==404)throw error;if(!viewActive(scope.id,scope.version))return;const out=await api('/conversations/'+send.id+'/messages',{method:'POST',body:{operationId:send.operationId,body:send.body}});if(out.receipt?.operationId!==send.operationId)throw Error('The saved reply could not be confirmed.');}
   if(!viewActive(scope.id,scope.version))return;try{sessionStorage.removeItem(PENDING_KEY);}catch{}pending=null;$('reply').value='';await readMessages();if(!viewActive(scope.id,scope.version))return;await list();if(viewActive(scope.id,scope.version))say('Reply saved to this conversation. No SMS or email was sent.');
 }
-$('login-form').addEventListener('submit',event=>{event.preventDefault();work(async()=>{const epoch=sessionVersion;token=$('owner-key').value;sessionAbort=new AbortController();$('owner-key').value='';try{await list();$('login').hidden=true;$('inbox').hidden=false;if(pending||pendingEstimate){await select(pending?.id||pendingEstimate.id);if(selectionReady())say('An action was pending before this page reloaded. Use its retry button to confirm the original operation.');}else say(storageReady?'Private inbox open.':'This tab cannot preserve pending actions. You can read messages, but sending is disabled.');}catch(error){if(epoch===sessionVersion)token='';throw error;}});});
+$('login-form').addEventListener('submit',event=>{event.preventDefault();work(async()=>{const epoch=sessionVersion;token=$('owner-key').value;sessionAbort=new AbortController();$('owner-key').value='';try{await list();$('login').hidden=true;$('inbox').hidden=false;if(pending||pendingEstimate){await select(pending?.id||pendingEstimate.id);if(selectionReady())say('An action was pending before this page reloaded. Use its retry button to confirm the original operation.');}else say(storageReady?'Private inbox open.':'This tab cannot preserve pending actions. You can read messages, but sending is disabled.');}catch(error){if(epoch===sessionVersion){lockInbox();say('The inbox could not finish opening. Sign in again to retry. '+error.message);}throw error;}});});
 $('lock').addEventListener('click',lockInbox);
 $('refresh').addEventListener('click',()=>work(async()=>{await list();if(current){if(selectionReady())await readMessages();else await select(current);}if(token)say('Saved messages refreshed.');}));$('more').addEventListener('click',()=>work(()=>list(true)));$('more-messages').addEventListener('click',()=>work(()=>readMessages()));
 $('retry-photos').addEventListener('click',()=>{if(selectionReady()&&!photoLoading)void showPhotos(photoRows);});
@@ -144,7 +145,7 @@ $('quote-form').addEventListener('submit',event=>{event.preventDefault();work(as
 $('estimate-preview-button').addEventListener('click',()=>{try{previewEstimate();}catch(error){say(error.message);}});
 $('estimate-form').addEventListener('input',()=>{previewSignature='';$('estimate-preview').hidden=true;controls();});
 $('estimate-form').addEventListener('submit',event=>{event.preventDefault();work(async()=>{const scope=selectedScope();if(pending||pendingEstimate||!$('estimate-form').reportValidity())return;rememberEstimate({kind:'draft',id:scope.id,operationId:crypto.randomUUID(),input:estimateInput()});await sendEstimatePending();});});
-$('estimate-send').addEventListener('click',()=>work(async()=>{if(!estimateReady())throw Error('Save your draft and preview the saved version before sending.');rememberEstimate({kind:'publish',id:current,estimateId:loadedEstimate.id,operationId:crypto.randomUUID()});await sendEstimatePending();}));
+$('estimate-send').addEventListener('click',()=>work(async()=>{const scope=selectedScope();if(!estimateReady())throw Error('Save your draft and preview the saved version before sending.');rememberEstimate({kind:'publish',id:scope.id,estimateId:loadedEstimate.id,operationId:crypto.randomUUID()});await sendEstimatePending();}));
 $('estimate-retry').addEventListener('click',()=>work(sendEstimatePending));
 $('revoke').addEventListener('click',()=>work(async()=>{const scope=selectedScope();await api('/conversations/'+scope.id+'/revoke',{method:'POST',body:{}});if(viewActive(scope.id,scope.version)){$('access-status').textContent='This private return link has been revoked. Saved messages are retained.';guestActive=false;controls();say('Customer return access revoked.');}}));
 window.addEventListener('pagehide',lockInbox);

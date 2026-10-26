@@ -15,9 +15,10 @@ const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:
 function view(id,photos=[]){return {ok:true,conversation:{id,repair:{name:id===a?'SYNTHETIC A':'SYNTHETIC B',phone:id===a?'2395550101':'2395550102',email:id===a?'a@example.invalid':'b@example.invalid'},expiresAt:'2027-01-01T00:00:00.000Z'},messages:[],cursor:0,quoteDetails:quotes[id],guestAccess:{active:true},photos,estimates:[]};}
 function deferred(){let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};}
 async function wait(check){for(let i=0;i<200;i++){if(check())return;await new Promise(done=>setTimeout(done,10));}throw Error('Synthetic owner state did not settle.');}
-function setup(t,respond){
+function setup(t,respond,{pending}={}){
   const dom=new JSDOM(ownerHTML,{url:'https://owner.example.invalid/owner',runScripts:'outside-only'}),doc=dom.window.document,calls=[],created=[],revoked=[];
   Object.defineProperty(dom.window,'crypto',{value:webcrypto});Object.defineProperty(dom.window,'AbortController',{value:AbortController});
+  if(pending)dom.window.sessionStorage.setItem(pendingKey,JSON.stringify(pending));
   dom.window.URL.createObjectURL=blob=>{const value='blob:synthetic-'+created.length;created.push({value,blob});return value;};
   dom.window.URL.revokeObjectURL=value=>revoked.push(value);
   dom.window.fetch=async(path,options={})=>{
@@ -68,7 +69,7 @@ test('a failed core selection clears A, blocks every write, and refresh can load
   assert.equal(x.doc.getElementById('customer').textContent,'');assert.equal(x.doc.getElementById('address').value,'');assert.equal(x.doc.getElementById('estimate-scope').value,'');
   assert.equal(x.doc.getElementById('phone').hasAttribute('href'),false);
   failed=true;load.resolve(json({ok:false,error:'service_busy'},503));
-  await wait(()=>x.settled()&&/could not be completed/.test(x.doc.getElementById('status').textContent));
+  await wait(()=>x.settled()&&/service is busy/.test(x.doc.getElementById('status').textContent));
   for(const id of ['quote-form','reply-form','estimate-form']){x.submit(id);await new Promise(done=>setTimeout(done,0));}
   x.doc.getElementById('revoke').dispatchEvent(new x.dom.window.MouseEvent('click'));await new Promise(done=>setTimeout(done,0));
   assert.equal(x.calls.filter(call=>call.method==='POST').length,0);
@@ -117,4 +118,52 @@ test('locking an uncertain reply preserves its exact operation and reconciles be
   await x.login();assert.equal(x.doc.getElementById('reply').value,original.body);x.doc.getElementById('retry').click();
   await wait(()=>!x.dom.window.sessionStorage.getItem(pendingKey)&&x.settled());
   assert.equal(x.calls.filter(call=>call.path.endsWith('/messages')&&call.method==='POST').length,1);
+});
+
+test('a write 503 while photos load keeps the frozen reply for the same explicit retry',async t=>{
+  const image=deferred();let attempts=0,accepted=0,original;
+  const x=setup(t,(path,options)=>{
+    if(path==='/owner/api/conversations/'+a+'?after=0')return json(view(a,[{id:photo,filename:'synthetic.png'}]));
+    if(path==='/owner/api/conversations/'+a+'/photos/'+photo)return image.promise;
+    if(path.includes('/operations/'))return accepted?json({ok:true,receipt:{operationId:original.operationId}}):json({ok:false,error:'operation_unavailable'},404);
+    if(path.endsWith('/messages')&&options.method==='POST'){
+      const body=JSON.parse(options.body);if(!original)original=body;else assert.deepEqual(body,original);
+      if(++attempts===1)return json({ok:false,error:'service_busy'},503);
+      accepted++;return json({ok:true,receipt:{operationId:body.operationId}});
+    }
+  });
+  await x.login();await x.select(a);assert.match(x.doc.getElementById('photo-status').textContent,/Loading/);
+  x.doc.getElementById('reply').value='Synthetic frozen busy reply';x.submit('reply-form');
+  await wait(()=>attempts===1&&x.settled());
+  const retained=x.dom.window.sessionStorage.getItem(pendingKey);
+  assert.deepEqual(JSON.parse(retained),{id:a,operationId:original.operationId,body:original.body});
+  assert.match(x.doc.getElementById('status').textContent,/busy.*Wait.*same pending action.*original details/s);
+  assert.equal(x.doc.getElementById('reply').disabled,true);
+  x.doc.getElementById('reply').value='A later edit must not replace the frozen reply';
+  x.doc.getElementById('retry').click();await wait(()=>!x.dom.window.sessionStorage.getItem(pendingKey)&&x.settled());
+  assert.equal(attempts,2);assert.equal(accepted,1);
+  const writes=x.calls.filter(call=>call.path.endsWith('/messages')&&call.method==='POST');
+  assert.deepEqual(writes[0].body,writes[1].body);
+  assert.equal(writes[1].body.body,'Synthetic frozen busy reply');
+  x.doc.getElementById('retry').dispatchEvent(new x.dom.window.MouseEvent('click'));await new Promise(done=>setTimeout(done,10));
+  assert.equal(attempts,2);
+  x.doc.getElementById('lock').click();image.resolve(json({ok:false,error:'service_busy'},503));
+});
+
+test('failed pending-request selection during login locks and clears private UI while retaining the pending action',async t=>{
+  const pending={id:a,operationId:'44444444-4444-4444-8444-444444444444',body:'Synthetic retained login reply'};
+  let unavailable=true;
+  const x=setup(t,path=>{
+    if(path==='/owner/api/conversations/'+a+'?after=0'&&unavailable)return json({ok:false,error:'service_busy'},503);
+  },{pending});
+  x.doc.getElementById('owner-key').value='S'.repeat(43);x.submit('login-form');
+  await wait(()=>/could not finish opening/.test(x.doc.getElementById('status').textContent));
+  assert.equal(x.doc.getElementById('inbox').hidden,true);assert.equal(x.doc.getElementById('login').hidden,false);
+  assert.equal(x.doc.getElementById('lock').disabled,true);assert.equal(x.doc.getElementById('owner-key').value,'');
+  assert.equal(x.doc.getElementById('list').childElementCount,0);assert.equal(x.doc.getElementById('customer').textContent,'');
+  assert.equal(x.doc.getElementById('address').value,'');assert.equal(x.doc.getElementById('reply').value,'');
+  assert.deepEqual(JSON.parse(x.dom.window.sessionStorage.getItem(pendingKey)),pending);
+  unavailable=false;await x.login();assert.equal(x.doc.getElementById('customer').textContent,'SYNTHETIC A');
+  assert.equal(x.doc.getElementById('reply').value,pending.body);
+  assert.equal(x.calls.filter(call=>call.method==='POST').length,0);
 });
