@@ -5,6 +5,7 @@
   "type": "module",
   "engines": { "node": ">=24" },
   "scripts": {
+    "dev": "node tools/dev-preview.mjs",
     "test": "node --test",
     "build": "node tools/build.mjs",
     "preview": "node tools/preview.mjs"

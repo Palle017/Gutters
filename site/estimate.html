@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#182c3c"><meta name="referrer" content="no-referrer">
+  <title>Request an Estimate | Everything Screen and Gutters</title>
+  <meta name="description" content="Tell John about your gutter, drainage, or screen project. Add photos and receive a private estimate after John reviews the work.">
+  <link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/americana.css"><link rel="stylesheet" href="css/estimate.css">
+  <script src="js/main.js" defer></script><script src="js/estimate.js" type="module"></script>
+<link rel="canonical" href="https://wisdomscreen.pro/estimate.html">
+<meta property="og:url" content="https://wisdomscreen.pro/estimate.html">
+</head>
+<body class="americana estimate-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="utility"><span>Southwest Florida · Screens, gutters &amp; drainage</span><a href="tel:+12393553686">Call John: (239) 355-3686</a></div>
+  <header class="header"><a class="wordmark" href="index.html"><span class="brand-star" aria-hidden="true">★</span><span><b>EVERYTHING</b><small>SCREEN &amp; GUTTERS</small></span></a><button class="menu-toggle" type="button" aria-controls="nav" aria-expanded="false">Menu</button><nav id="nav" aria-label="Main navigation"><a href="index.html">Home</a><a href="gutters.html">Gutters</a><a href="screens.html">Screens</a><a href="projects.html">Projects</a><a href="offers.html">Specials</a><a href="estimate.html" aria-current="page">Request estimate</a></nav></header>
+  <main id="main">
+    <section class="request-hero"><div class="request-wrap"><p class="request-eyebrow">YOUR PROJECT STARTS HERE</p><h1>Tell John what<br>you have in mind.</h1><p>A few details, a few photos, and a conversation about your home. John reviews the work and prepares your estimate personally.</p></div></section>
+    <div class="request-wrap request-layout">
+      <section class="request-panel" aria-labelledby="form-heading">
+        <div id="request-entry"><div class="request-section-heading"><span class="request-step">01</span><div><h2 id="form-heading">Your project details</h2><p>Only your name and callback number are required.</p></div></div>
+          <form id="estimate-form">
+            <fieldset id="request-fields"><legend class="sr-only">Contact and project details</legend>
+              <div class="request-fields-grid"><div class="request-field"><label for="name">Your name <span>Required</span></label><input id="name" name="name" autocomplete="name" maxlength="100" required></div><div class="request-field"><label for="phone">Phone number <span>Required</span></label><input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="40" required inputmode="tel" placeholder="(239) 555-0123"></div></div>
+              <div class="request-field"><label for="details">What work do you need? <span>Optional</span></label><textarea id="details" name="details" rows="4" maxlength="4000" placeholder="Tell John about your gutters, drainage, screens, or rescreening project."></textarea></div>
+              <div class="request-field"><label for="address">Project address <span>Optional</span></label><input id="address" name="address" autocomplete="street-address" maxlength="300" placeholder="Street address and city"></div>
+              <div class="request-fields-grid"><div class="request-field"><label for="homeSize">Home size <span>Optional</span></label><input id="homeSize" name="homeSize" maxlength="100" placeholder="If known, include your units"></div><div class="request-field"><label for="stories">Number of stories <span>Optional</span></label><select id="stories" name="stories"><option value="">I’m not sure / tell John later</option><option value="1">One story</option><option value="2">Two stories</option></select></div></div>
+              <div class="request-field"><label for="gutterLength">Gutter length <span>Optional</span></label><input id="gutterLength" name="gutterLength" maxlength="100" placeholder="If known, include your units"><p class="request-helper">No measuring needed to get started. Leave anything you don’t know blank.</p></div>
+            </fieldset>
+            <div class="request-photo-heading"><span class="request-step">02</span><div><h2>Add project photos</h2><p>Optional · Up to 6 photos · JPEG, PNG, or WebP · 5 MB each</p></div></div>
+            <div class="request-upload"><label for="photos"><strong>Show John what you’re looking at.</strong><span>Add a wide view and close-ups of the work, if you have them.</span></label><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="photo-note"><label for="camera-photo" class="request-camera-label">Take a photo with your phone →</label><input id="camera-photo" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"><p id="photo-note" class="request-helper">Use your phone’s camera or select photos from your library.</p></div>
+            <p id="photo-error" class="request-status request-error" role="alert" hidden></p><ul id="photo-list" class="request-photo-list" aria-label="Selected project photos"></ul>
+            <div class="request-submit"><p>John sets the scope and price after reviewing your request. A property visit may be needed before a firm quote.</p><button id="submit-request" class="request-button" type="submit">Send request to John <span aria-hidden="true">→</span></button></div>
+          </form>
+        </div>
+        <div id="request-success" hidden tabindex="-1"><p class="request-eyebrow">REQUEST SAVED</p><h2>Your project is in John’s inbox.</h2><p id="success-details"></p><p>Keep your private link to view John’s estimate, check for messages, and reply.</p><div class="request-success-actions"><a id="open-request" class="request-button" href="customer.html">Open my private request →</a><button id="copy-request-link" class="request-secondary" type="button">Copy private link</button><button id="start-another-request" class="request-secondary" type="button">Start another request</button></div><input id="private-request-link" class="private-link-field" readonly aria-label="Your private request link" hidden><p class="request-helper">Anyone with this link can view your request and photos. Keep it private.</p></div>
+        <p id="request-status" class="request-status" role="status" aria-live="polite"></p>
+        <section id="previous-requests" class="request-history" aria-labelledby="previous-requests-title" hidden><h2 id="previous-requests-title">Earlier requests in this tab</h2><ul id="previous-request-list"></ul></section>
+      </section>
+      <aside class="request-aside"><p class="request-eyebrow">LOCAL WORK. STRAIGHT ANSWERS.</p><h2>From your first photo<br>to John’s estimate.</h2><ol class="request-process"><li><strong>Tell us about the work.</strong><span>Add the details you know and photos of the project.</span></li><li><strong>John takes a look.</strong><span>He reviews your request and can ask questions in your private conversation.</span></li><li><strong>See your estimate.</strong><span>John shares his scope and price on your private page.</span></li></ol><div class="request-callout"><h3>Prefer to talk it through?</h3><p>Call or text John about your gutter, drainage, or screen project.</p><a href="tel:+12393553686">(239) 355-3686 ↗</a><a href="sms:+12393553686">Text John →</a></div></aside>
+    </div>
+  </main>
+  <footer class="request-footer"><div class="request-wrap"><a href="index.html">EVERYTHING SCREEN &amp; GUTTERS</a><p>Fort Myers · Cape Coral · Southwest Florida</p><a href="mailto:Jwisdom030@gmail.com">Jwisdom030@gmail.com</a></div></footer>
+</body>
+</html>

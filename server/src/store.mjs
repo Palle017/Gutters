@@ -2,7 +2,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {QUESTIONS,sha,equal,fail} from './protocol.mjs';
+import {QUESTIONS,PHOTO_MAX_COUNT,sha,equal,fail} from './protocol.mjs';
 
 const SCHEMA=`
 CREATE TABLE IF NOT EXISTS schema_version(version INTEGER PRIMARY KEY CHECK(version=1));
@@ -30,6 +30,22 @@ CREATE TABLE IF NOT EXISTS operations(
 CREATE TABLE IF NOT EXISTS rate_limits(bucket TEXT PRIMARY KEY,window_start INTEGER NOT NULL,count INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS conversations_created ON conversations(created_at DESC,id);
 CREATE INDEX IF NOT EXISTS messages_conversation ON messages(conversation_id,sequence);
+CREATE TABLE IF NOT EXISTS photos(
+ id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL REFERENCES conversations(id),filename TEXT NOT NULL,
+ mime TEXT NOT NULL,size INTEGER NOT NULL CHECK(size>0 AND size<=5242880),bytes BLOB NOT NULL,created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS photos_conversation ON photos(conversation_id,created_at,id);
+CREATE TABLE IF NOT EXISTS estimates(
+ id TEXT PRIMARY KEY,number INTEGER NOT NULL UNIQUE,conversation_id TEXT NOT NULL REFERENCES conversations(id),
+ scope TEXT NOT NULL,amount TEXT NOT NULL,notes TEXT NOT NULL,created_at TEXT NOT NULL,published_at TEXT,
+ message_id TEXT REFERENCES messages(id)
+);
+CREATE INDEX IF NOT EXISTS estimates_conversation ON estimates(conversation_id,number DESC);
+CREATE TABLE IF NOT EXISTS feature_operations(
+ conversation_id TEXT NOT NULL REFERENCES conversations(id),operation_id TEXT NOT NULL,actor TEXT NOT NULL CHECK(actor IN('customer','owner')),
+ kind TEXT NOT NULL,content_hash TEXT NOT NULL,entity_id TEXT NOT NULL,receipt_json TEXT NOT NULL,created_at TEXT NOT NULL,
+ PRIMARY KEY(conversation_id,operation_id)
+);
 `;
 
 export function openStore(filename,{now=Date.now}={}) {
@@ -48,6 +64,16 @@ export function openStore(filename,{now=Date.now}={}) {
   }
   function receipt(row) {return {operationId:row.operation_id,messageId:row.message_id,sequence:row.sequence};}
   function operation(id,operationId) {return db.prepare('SELECT * FROM operations WHERE conversation_id=? AND operation_id=?').get(id,operationId);}
+  function featureOperation(id,operationId){return db.prepare('SELECT * FROM feature_operations WHERE conversation_id=? AND operation_id=?').get(id,operationId);}
+  const photoInfo=row=>({id:row.id,filename:row.filename,mime:row.mime,size:row.size,createdAt:row.created_at});
+  const estimateInfo=row=>row?({id:row.id,number:'ESG-'+String(row.number).padStart(6,'0'),scope:row.scope,amount:row.amount,currency:'USD',notes:row.notes,status:row.published_at?'published':'draft',createdAt:row.created_at,publishedAt:row.published_at}):null;
+  function retryFeature(id,input,actor,kind,hash){
+    if(operation(id,input.operationId))throw fail(409,'operation_conflict');
+    const saved=featureOperation(id,input.operationId);
+    if(saved&&(saved.actor!==actor||saved.kind!==kind||saved.content_hash!==hash))throw fail(409,'operation_conflict');
+    return saved;
+  }
+  function saveFeature(id,operationId,actor,kind,hash,entityId,value,at){db.prepare('INSERT INTO feature_operations(conversation_id,operation_id,actor,kind,content_hash,entity_id,receipt_json,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,operationId,actor,kind,hash,entityId,JSON.stringify(value),at);return value;}
   function snapshot(row) {
     const answers=JSON.parse(row.answers_json),provided=Object.fromEntries(answers.filter(x=>x.state==='provided').map(x=>[x.field,x.answer]));
     return {...provided,fieldStates:Object.fromEntries(answers.map(x=>[x.field,x.state]))};
@@ -56,7 +82,10 @@ export function openStore(filename,{now=Date.now}={}) {
     const row=record(id); if (!row) throw fail(404,'conversation_unavailable');
     const messages=db.prepare('SELECT id,sequence,role,body,created_at,operation_id FROM messages WHERE conversation_id=? AND sequence>? ORDER BY sequence LIMIT 100').all(id,after).map(x=>({id:x.id,sequence:x.sequence,role:x.role,body:x.body,createdAt:x.created_at,operationId:x.operation_id}));
     const data={ok:true,conversation:{id:row.id,leadId:row.id,expiresAt:row.expires_at,repair:snapshot(row)},messages,cursor:messages.at(-1)?.sequence||after};
+    data.photos=db.prepare('SELECT id,filename,mime,size,created_at FROM photos WHERE conversation_id=? ORDER BY created_at,id').all(id).map(photoInfo);
+    data.estimate=estimateInfo(db.prepare('SELECT * FROM estimates WHERE conversation_id=? AND published_at IS NOT NULL ORDER BY published_at DESC,number DESC LIMIT 1').get(id));
     if(owner) {
+      data.estimates=db.prepare('SELECT * FROM estimates WHERE conversation_id=? ORDER BY number DESC LIMIT 50').all(id).map(estimateInfo);
       data.quoteDetails=db.prepare('SELECT address,size_of_home,stories,gutter_length FROM quote_details WHERE conversation_id=?').get(id);
       data.guestAccess={active:!row.revoked_at&&Date.parse(row.expires_at)>now(),revoked:Boolean(row.revoked_at),expiresAt:row.expires_at};
     }
@@ -96,6 +125,7 @@ export function openStore(filename,{now=Date.now}={}) {
     return tx(()=>{
       const row=owner?record(id):guest(id,token); if(!row) throw fail(404,'conversation_unavailable');
       const actor=owner?'owner':'customer',hash=sha(JSON.stringify({actor,body:input.body})),saved=operation(id,input.operationId);
+      if(featureOperation(id,input.operationId))throw fail(409,'operation_conflict');
       if(saved) {
         if(saved.actor!==actor || saved.content_hash!==hash) throw fail(409,'operation_conflict');
         return {ok:true,receipt:receipt(saved),duplicate:true};
@@ -109,6 +139,7 @@ export function openStore(filename,{now=Date.now}={}) {
   function operationReceipt(id,operationId,{token,owner=false}={}) {
     if(owner){if(!record(id))throw fail(404,'conversation_unavailable');}else guest(id,token);
     const op=operation(id,operationId);
+    if(!op){const feature=featureOperation(id,operationId);if(!feature||feature.actor!==(owner?'owner':'customer'))throw fail(404,'operation_unavailable');return {ok:true,receipt:JSON.parse(feature.receipt_json)};}
     if(!op || op.actor===(owner?'customer':'owner')) throw fail(404,'operation_unavailable');
     return {ok:true,receipt:receipt(op)};
   }
@@ -125,6 +156,52 @@ export function openStore(filename,{now=Date.now}={}) {
     db.prepare('UPDATE quote_details SET address=?,size_of_home=?,stories=?,gutter_length=? WHERE conversation_id=?').run(quote.address,quote.size_of_home,quote.stories,quote.gutter_length,id);
     return {ok:true,quoteDetails:quote};
   }
+  function addPhoto(id,input,{token}={}) {
+    return tx(()=>{
+      guest(id,token);
+      const saved=retryFeature(id,input,'customer','photo',input.hash);
+      if(saved){const row=db.prepare('SELECT id,filename,mime,size,created_at FROM photos WHERE id=? AND conversation_id=?').get(saved.entity_id,id);return {ok:true,photo:photoInfo(row),receipt:JSON.parse(saved.receipt_json),duplicate:true};}
+      if(db.prepare('SELECT COUNT(*) AS n FROM photos WHERE conversation_id=?').get(id).n>=PHOTO_MAX_COUNT)throw fail(409,'photo_limit');
+      const photoId=randomUUID(),at=stamp();
+      db.prepare('INSERT INTO photos(id,conversation_id,filename,mime,size,bytes,created_at) VALUES(?,?,?,?,?,?,?)').run(photoId,id,input.filename,input.mime,input.bytes.length,input.bytes,at);
+      const value=saveFeature(id,input.operationId,'customer','photo',input.hash,photoId,{operationId:input.operationId,photoId},at);
+      return {ok:true,photo:{id:photoId,filename:input.filename,mime:input.mime,size:input.bytes.length,createdAt:at},receipt:value};
+    });
+  }
+  function readPhoto(id,photoId,{token,owner=false}={}) {
+    if(owner){if(!record(id))throw fail(404,'conversation_unavailable');}else guest(id,token);
+    const row=db.prepare('SELECT * FROM photos WHERE id=? AND conversation_id=?').get(photoId,id);
+    if(!row)throw fail(404,'photo_unavailable');return row;
+  }
+  function saveEstimate(id,input) {
+    return tx(()=>{
+      if(!record(id))throw fail(404,'conversation_unavailable');
+      const hash=sha(JSON.stringify({scope:input.scope,amount:input.amount,notes:input.notes}));
+      const saved=retryFeature(id,input,'owner','estimate-draft',hash);
+      if(saved)return {ok:true,estimate:estimateInfo(db.prepare('SELECT * FROM estimates WHERE id=? AND conversation_id=?').get(saved.entity_id,id)),receipt:JSON.parse(saved.receipt_json),duplicate:true};
+      const estimateId=randomUUID(),at=stamp(),number=db.prepare('SELECT COALESCE(MAX(number),0)+1 AS next FROM estimates').get().next;
+      db.prepare('INSERT INTO estimates(id,number,conversation_id,scope,amount,notes,created_at) VALUES(?,?,?,?,?,?,?)').run(estimateId,number,id,input.scope,input.amount,input.notes,at);
+      const value=saveFeature(id,input.operationId,'owner','estimate-draft',hash,estimateId,{operationId:input.operationId,estimateId},at);
+      return {ok:true,estimate:estimateInfo(db.prepare('SELECT * FROM estimates WHERE id=?').get(estimateId)),receipt:value};
+    });
+  }
+  function publishEstimate(id,estimateId,input) {
+    return tx(()=>{
+      const conversation=record(id);if(!conversation)throw fail(404,'conversation_unavailable');
+      const hash=sha(JSON.stringify({estimateId})),saved=retryFeature(id,input,'owner','estimate-publish',hash);
+      if(saved)return {ok:true,estimate:estimateInfo(db.prepare('SELECT * FROM estimates WHERE id=? AND conversation_id=?').get(estimateId,id)),receipt:JSON.parse(saved.receipt_json),duplicate:true};
+      if(conversation.revoked_at||Date.parse(conversation.expires_at)<=now())throw fail(410,'access_expired');
+      const row=db.prepare('SELECT * FROM estimates WHERE id=? AND conversation_id=?').get(estimateId,id);
+      if(!row)throw fail(404,'estimate_unavailable');
+      if(row.published_at)throw fail(409,'estimate_already_published');
+      if(db.prepare('SELECT COUNT(*) AS n FROM messages WHERE conversation_id=?').get(id).n>=1000)throw fail(409,'message_limit');
+      const at=stamp(),estimate=estimateInfo(row),body='Estimate '+estimate.number+'\nScope: '+row.scope+'\nAmount: $'+row.amount+' USD'+(row.notes?'\nNotes: '+row.notes:'');
+      const message=append(id,'owner',body,input.operationId,0,at);
+      db.prepare('UPDATE estimates SET published_at=?,message_id=? WHERE id=?').run(at,message.id,estimateId);
+      const value=saveFeature(id,input.operationId,'owner','estimate-publish',hash,estimateId,{operationId:input.operationId,estimateId,messageId:message.id,sequence:message.sequence},at);
+      return {ok:true,estimate:estimateInfo(db.prepare('SELECT * FROM estimates WHERE id=?').get(estimateId)),receipt:value};
+    });
+  }
   function revoke(id) {
     if(!record(id)) throw fail(404,'conversation_unavailable');
     db.prepare('UPDATE conversations SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').run(stamp(),id);
@@ -136,5 +213,5 @@ export function openStore(filename,{now=Date.now}={}) {
     if(row.count>max)throw fail(429,'rate_limited');
     if(Math.random()<0.01)db.prepare('DELETE FROM rate_limits WHERE window_start<?').run(window-120000);
   }
-  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,revoke,rate,close:()=>db.close()};
+  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,addPhoto,readPhoto,saveEstimate,publishEstimate,revoke,rate,close:()=>db.close()};
 }

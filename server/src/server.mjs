@@ -1,5 +1,6 @@
 import http from 'node:http';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {createApp} from './app.mjs';
 
 const host=process.env.GUTTERS_BIND_HOST||'127.0.0.1';
@@ -12,6 +13,7 @@ const app=createApp({
   publicOrigin:process.env.GUTTERS_PUBLIC_ORIGIN||'http://127.0.0.1:'+port,
   allowedOrigins:(process.env.GUTTERS_ALLOWED_ORIGINS||'https://palle017.github.io').split(',').map(x=>x.trim()).filter(Boolean),
   clientKey:request=>request.headers.get('x-gutters-client-key')||'unknown',
+  siteRoot:process.env.GUTTERS_SERVE_SITE==='true'?fileURLToPath(new URL('../../site/',import.meta.url)):null,
 });
 const server=http.createServer(async(req,res)=>{
   try {
