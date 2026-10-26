@@ -73,3 +73,17 @@ test('rescreening copy preserves small jobs, exact screen types, and a qualified
   const home=new JSDOM(await readFile(path.join(site,'index.html'),'utf8')).window.document;
   assert.ok(home.querySelector('a[href="rescreening-restoration.html"]'),'homepage directly reaches rescreening page');
 });
+
+test('underground drainage copy keeps the owner-supplied no-grading boundary',async()=>{
+  const doc=new JSDOM(await readFile(path.join(site,'underground-drainage.html'),'utf8')).window.document;
+  assert.match(doc.querySelector('main').textContent,/We do not offer grading/);
+  assert.doesNotMatch(doc.querySelector('main').textContent,/French drains|sump pumps|foundation repair|guaranteed dry|40[- ]?(?:ft|foot)/i);
+});
+
+test('tarp draft stays within replacement/installation wording without adding adjacent services',async()=>{
+  const doc=new JSDOM(await readFile(path.join(site,'boat-canopy-awning-tarps.html'),'utf8')).window.document;
+  const copy=doc.querySelector('main').textContent;
+  assert.match(copy,/Boat canopy tarp replacement and installation/);
+  assert.match(copy,/Awning tarp replacement and installation/);
+  assert.doesNotMatch(copy,/boat lift|framework|canvas fabrication|custom fabrication|wording.*confirm|internal|draft/i);
+});

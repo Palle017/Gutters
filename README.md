@@ -2,7 +2,7 @@
 
 Website and private customer-request/estimate workflow for John Wisdom’s Southwest Florida business. The current local design uses the Heritage Americana direction: navy, faded red, warm cream, rustic details, and owner-supplied project photography.
 
-The local implementation includes dedicated gutter and screen pages, a project gallery, supplied advertisements, photo estimate requests, a private customer conversation page, and an owner inbox for manually writing and sending estimates. This work has not been pushed or published. The existing Ubuntu service on loopback port **18965** and the existing public website remain unchanged.
+The local implementation includes dedicated gutter and screen pages, a project gallery, supplied advertisements, photo estimate requests, a private customer conversation page, and an owner inbox for manually writing and sending estimates. The finished source is prepared for Raj to review and deploy to WisdomScreen.pro. The existing Ubuntu service on loopback port **18965** and the existing public website remain unchanged.
 
 ## Run locally
 
@@ -63,4 +63,4 @@ The homepage’s **4.9 / 5 from 32 Google reviews** is a snapshot checked on **O
 
 GitHub Pages can host the static website, but it cannot run the upload, SQLite, or estimate APIs by itself. The complete customer workflow needs the Node service and a correctly configured HTTPS reverse proxy serving the website/API from the same origin. `GUTTERS_SERVE_SITE=true` enables the service’s optional allowlisted `site/` serving; the local preview sets this automatically.
 
-No production request form has been activated, no source has been pushed, and no deployment or public-domain configuration has been changed by this local implementation. Any later publication must preserve the existing Ubuntu data, protected environment, loopback service, unrelated Perfect Timing services, and private customer records. Historical deployed-service evidence remains in [PR2-SQLITE-RELEASE.txt](docs/PR2-SQLITE-RELEASE.txt).
+No production request form has been activated and no public deployment or DNS change has been made by this implementation. Raj owns the launch handoff for WisdomScreen.pro. Any later publication must preserve the existing Ubuntu data, protected environment, loopback service, unrelated Perfect Timing services, and private customer records. Historical deployed-service evidence remains in [PR2-SQLITE-RELEASE.txt](docs/PR2-SQLITE-RELEASE.txt).

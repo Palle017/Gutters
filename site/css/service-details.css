@@ -1,0 +1,29 @@
+/* Heritage styling for the retained service descriptions. */
+.legacy-detail .page-hero{display:block;min-height:0;background:var(--navy);color:var(--cream);padding:0;border-bottom:4px solid var(--red)}
+.legacy-detail .page-hero:before{display:none}
+.legacy-detail .page-hero>.container{width:min(1100px,calc(100% - 80px));max-width:1100px;margin:auto;padding:66px 0 64px}
+.legacy-detail .hero-badge{display:block;background:transparent;color:var(--gold);padding:0;margin:0 0 20px;font:700 10px/1.7 Arial,Helvetica,sans-serif;letter-spacing:.18em;text-transform:uppercase}
+.legacy-detail .page-hero h1{font:700 clamp(40px,5vw,67px)/1.08 Georgia,'Times New Roman',serif;letter-spacing:-.04em;max-width:900px;margin:0 0 24px}
+.legacy-detail .page-hero p{max-width:780px;font-size:17px;line-height:1.8;color:#ddd8ca;margin:0 0 24px}
+.legacy-detail .hero-ctas{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:25px 0 0}
+.legacy-detail .btn{border-radius:0;font:700 12px/1.5 Arial,Helvetica,sans-serif;text-decoration:none;min-height:50px;padding:15px 22px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent}
+.legacy-detail .btn-accent{background:var(--red);color:var(--cream);border-color:var(--red)}
+.legacy-detail .btn-accent:hover{background:#bd4b3e;border-color:#bd4b3e}
+.legacy-detail .btn-outline{background:transparent;color:var(--cream);border-color:#e5d6ba99}
+.legacy-detail .btn-outline:hover{background:#ffffff12}
+.legacy-detail .section{background:var(--paper);color:var(--ink);padding:65px 0 70px}
+.legacy-detail .section>.container{width:min(930px,calc(100% - 80px));max-width:930px;padding:0;margin:auto}
+.legacy-detail .prose h2{font:700 clamp(27px,3vw,36px)/1.2 Georgia,'Times New Roman',serif;letter-spacing:-.035em;margin:40px 0 17px;color:var(--ink)}
+.legacy-detail .prose h2:first-child{margin-top:0}
+.legacy-detail .prose p{font-size:15px;line-height:1.95;margin:0 0 19px;color:#4d5555;max-width:none}
+.legacy-detail .prose a{color:#8d352a;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}
+.legacy-detail .prose a:hover{color:#68281f}
+.legacy-detail .cta-band{background:var(--red);color:var(--cream);padding:55px 0 60px}
+.legacy-detail .cta-band>.container{width:min(1100px,calc(100% - 80px));max-width:1100px;margin:auto;padding:0}
+.legacy-detail .cta-band h2{font:700 clamp(30px,3.5vw,44px)/1.16 Georgia,'Times New Roman',serif;letter-spacing:-.035em;margin:0 0 16px}
+.legacy-detail .cta-band p{font-size:14px;line-height:1.85;color:#eee2d1;margin:0}
+.legacy-detail .cta-band .btn-accent{background:var(--cream);color:#802f25;border-color:var(--cream)}
+.legacy-detail .cta-band .btn-accent:hover{background:#fff8eb}
+.legacy-detail .site-foot p{font-size:11px;line-height:1.8}
+@media(max-width:650px){.legacy-detail .page-hero>.container{width:86%;padding:43px 0}.legacy-detail .page-hero h1{font-size:clamp(38px,10vw,53px);overflow-wrap:anywhere}.legacy-detail .page-hero p{font-size:14px;line-height:1.85}.legacy-detail .hero-badge{font-size:9px;letter-spacing:.14em}.legacy-detail .hero-ctas{gap:12px;margin-top:22px}.legacy-detail .btn{padding:14px 17px;font-size:11px}.legacy-detail .section{padding:40px 0 45px}.legacy-detail .section>.container{width:86%}.legacy-detail .prose h2{font-size:29px;margin-top:32px}.legacy-detail .prose p{font-size:14px;line-height:1.9}.legacy-detail .cta-band{padding:42px 0 47px}.legacy-detail .cta-band>.container{width:86%}.legacy-detail .cta-band h2{font-size:32px}.legacy-detail .cta-band p{font-size:13px}}
+@media(prefers-reduced-motion:reduce){.legacy-detail *{scroll-behavior:auto!important;transition:none!important}}

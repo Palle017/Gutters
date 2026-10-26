@@ -30,6 +30,6 @@ The Node test suite checks request/message durability, operation replay and conf
 
 ## State boundary
 
-This acceptance run verifies the local same-origin workflow. The existing deployed Ubuntu listener on port **18965** was not replaced or reconfigured. No production photo form was activated, and no source commit, push, deployment, domain change, SMS, or email send was performed for this local work. The estimate “send” means publication inside the customer’s private website conversation.
+This acceptance run verifies the local same-origin workflow. The existing deployed Ubuntu listener on port **18965** was not replaced or reconfigured. No production photo form, deployment, domain change, SMS, or customer email was activated by this acceptance run. The estimate “send” means publication inside the customer’s private website conversation.
 
 No owner key, customer capability, private return URL, or customer record identifier is included in this document.

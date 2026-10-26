@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /owner
+Disallow: /conversations/
+Disallow: /customer.html
+
+Sitemap: https://wisdomscreen.pro/sitemap.xml
