@@ -278,6 +278,7 @@ def inspect_database(connection, identifier):
     require(connection.execute("PRAGMA foreign_key_check").fetchall() == [], "sqlite_foreign_key_check_failed")
     forbidden = {"price", "prices", "rate", "rates", "formula", "formulas", "materials", "material", "estimator", "stage", "source", "marketing"}
     tables = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+    require(set(tables) == {"schema_version", "conversations", "quote_details", "messages", "operations", "rate_limits"}, "unexpected_database_tables")
     for table in tables:
         require(bool(re.fullmatch(r"[a-z_]+", table)), "unexpected_schema_name")
         require(table not in forbidden, "unexpected_business_table")
