@@ -1,0 +1,35 @@
+John / Raj interview supplied by Raj, October 25, 2026
+
+Business facts supplied in the interview:
+- John installs gutters and underground drainage.
+- John does not offer grading.
+- A relevant customer problem is wet/soaking ground between nearby homes.
+- The proposed customer value is collecting roof runoff and directing it away from the home with an appropriate drainage arrangement.
+- An online price would be a preliminary or pencil estimate, followed by John's site assessment.
+
+Pricing details heard, with ambiguity retained:
+- $8 per foot was mentioned alongside a 100-foot threshold.
+- $10 per foot was also mentioned. Which side of the threshold uses which rate is not clear in the transcript.
+- A $6 per-foot addition for second-story work was mentioned. Whether it applies only to upper-story runs or to the whole job is not clear.
+- Gutter length plus downspouts was mentioned. The exact billable-length calculation is not established.
+- A downspout at least every 40 feet was described as a practice. It is not established here as a universal legal/code requirement.
+
+Do not implement a pricing calculation until John confirms the rate bands, the exact 100-foot boundary, the billable footage including downspouts, and which footage receives the second-story addition. Do not add speculative pricing fields to SQLite.
+
+Educational claims to handle accurately:
+- Roof-water management can reduce water collecting around a home; gutters must discharge to a suitable location.
+- Standing water, wall/window/door problems or foundation cracks cannot be diagnosed from a website form.
+- The conversational $30,000 repair figure is not a verified local repair-price benchmark or a permitted scare claim.
+- Do not claim gutters are universally required or universally optional without verifying the applicable code/project.
+
+Primary educational sources researched for the proposed content increment:
+U.S. Department of Energy, Stormwater Gutters Downspouts:
+https://bsesc.energy.gov/energy-basics/stormwater-gutters-downspouts
+UF/IFAS, Homeowner Best Management Practices for the Home Lawn:
+https://ask.ifas.ufl.edu/publication/EP236
+UF/IFAS, Florida-Friendly Landscaping Handbook (downspout runoff/discharge guidance):
+https://ffl.ifas.ufl.edu/media/fflifasufledu/docs/publications/FFL-Handbook_Web_English.pdf
+Lee County Building & Permitting Services (current building-code/permit routing, not a 40-foot spacing rule):
+https://www.leegov.com/dcd/buildingpermitservice
+
+These sources support careful education about runoff; they do not validate John's pricing, a universal 40-foot code rule, a diagnosis, or a guaranteed repair saving.

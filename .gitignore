@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.preview-data/
+data/
+*.sqlite*
+*.db
+*.db-*
+*.log
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+coverage/
+artifacts/
+private/
