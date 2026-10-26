@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {realpathSync} from 'node:fs';
 import {createApp} from './app.mjs';
 import {clientIdentity} from './client-ip.mjs';
+import {notificationConfig,startNotificationWorker} from './notifications.mjs';
 
 // Pausing/cancelling a rejected body must not destroy its socket before the
 // rejection response can be delivered. The response then closes that socket.
@@ -113,15 +114,18 @@ function start() {
   if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid GUTTERS_PORT.');
   const publicOrigin=process.env.GUTTERS_PUBLIC_ORIGIN||'http://127.0.0.1:'+port;
   const allowedOrigins=(process.env.GUTTERS_ALLOWED_ORIGINS||'https://palle017.github.io').split(',').map(x=>x.trim()).filter(Boolean);
+  const notifications=notificationConfig();
+  if(notifications&&!publicOrigin.startsWith('https://'))throw Error('Email alerts require the canonical HTTPS service origin.');
   const app=createApp({
     dbPath:path.resolve(process.env.GUTTERS_DB_PATH||'data/gutters.sqlite3'),ownerToken:process.env.GUTTERS_OWNER_TOKEN,
-    publicOrigin,allowedOrigins,clientKey:request=>request.headers.get('x-gutters-client-key')||'unknown',
+    publicOrigin,allowedOrigins,notifications,clientKey:request=>request.headers.get('x-gutters-client-key')||'unknown',
     siteRoot:process.env.GUTTERS_SERVE_SITE==='true'?fileURLToPath(new URL('../../site/',import.meta.url)):null,
   });
   const server=createHTTPServer(app,{publicOrigin,allowedOrigins,trustProxy:process.env.GUTTERS_TRUST_PROXY||'false'});
+  const stopNotifications=startNotificationWorker(app.store,notifications);
   server.listen(port,host,()=>process.stdout.write(JSON.stringify({service:'gutters-messaging',listening:host+':'+port,storage:'sqlite'})+'\n'));
   let closing=false;
-  function stop(){if(closing)return;closing=true;server.close(()=>{app.close();process.exit(0);});setTimeout(()=>process.exit(1),10000).unref();}
+  function stop(){if(closing)return;closing=true;const pending=stopNotifications();server.close(async()=>{await pending;app.close();process.exit(0);});setTimeout(()=>process.exit(1),12000).unref();}
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
 }
 if(process.argv[1]&&realpathSync(process.argv[1])===realpathSync(fileURLToPath(import.meta.url)))start();

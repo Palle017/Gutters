@@ -3,6 +3,7 @@ import {mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {QUESTIONS,PHOTO_MAX_COUNT,sha,equal,fail} from './protocol.mjs';
+import {notificationPayload} from './notifications.mjs';
 
 const SCHEMA=`
 CREATE TABLE IF NOT EXISTS schema_version(version INTEGER PRIMARY KEY CHECK(version=1));
@@ -46,15 +47,51 @@ CREATE TABLE IF NOT EXISTS feature_operations(
  kind TEXT NOT NULL,content_hash TEXT NOT NULL,entity_id TEXT NOT NULL,receipt_json TEXT NOT NULL,created_at TEXT NOT NULL,
  PRIMARY KEY(conversation_id,operation_id)
 );
+CREATE TABLE IF NOT EXISTS owner_notifications(
+ id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL REFERENCES conversations(id),operation_id TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN('new_request','customer_reply')),payload_json TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','processing','accepted','failed','uncertain')),
+ attempts INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,first_attempt_at INTEGER,next_at INTEGER NOT NULL,
+ provider_id TEXT,last_error TEXT,UNIQUE(conversation_id,operation_id,kind)
+);
+CREATE INDEX IF NOT EXISTS owner_notifications_due ON owner_notifications(status,next_at);
+CREATE TABLE IF NOT EXISTS owner_notification_attempts(
+ notification_id TEXT NOT NULL REFERENCES owner_notifications(id),attempt INTEGER NOT NULL,started_at INTEGER NOT NULL,
+ PRIMARY KEY(notification_id,attempt)
+);
+CREATE INDEX IF NOT EXISTS owner_notification_attempts_time ON owner_notification_attempts(started_at);
 `;
 
-export function openStore(filename,{now=Date.now}={}) {
+export function openStore(filename,{now=Date.now,notifications=null,publicOrigin}={}) {
   if (filename!==':memory:') mkdirSync(dirname(filename),{recursive:true,mode:0o700});
   const db=new DatabaseSync(filename);
   db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
   db.exec(SCHEMA);
   const tx=fn=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}};
   const stamp=()=>new Date(now()).toISOString();
+  function enqueueNotification(id,operationId,kind,contact,message) {
+    if(!notifications)return;
+    const payload=notificationPayload(contact,kind,message,notifications,publicOrigin),at=now();
+    db.prepare('INSERT INTO owner_notifications(id,conversation_id,operation_id,kind,payload_json,created_at,next_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(),id,operationId,kind,JSON.stringify(payload),at,at);
+  }
+  function claimNotification(){return tx(()=>{
+    const at=now();
+    db.prepare("UPDATE owner_notifications SET status='uncertain',last_error='retry_window_closed' WHERE status IN('pending','processing') AND first_attempt_at IS NOT NULL AND (first_attempt_at<=? OR attempts>=6) AND next_at<=?").run(at-23*3600000,at);
+    db.prepare("UPDATE owner_notifications SET status='failed',last_error='stale_inquiry' WHERE status='pending' AND first_attempt_at IS NULL AND created_at<?").run(at-24*3600000);
+    const date=new Date(at),day=Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate());
+    if(db.prepare('SELECT COUNT(*) n FROM owner_notification_attempts WHERE started_at>=?').get(day).n>=50)return null;
+    const row=db.prepare("SELECT * FROM owner_notifications WHERE status IN('pending','processing') AND next_at<=? ORDER BY created_at,id LIMIT 1").get(at);if(!row)return null;
+    db.prepare("UPDATE owner_notifications SET status='processing',attempts=attempts+1,first_attempt_at=COALESCE(first_attempt_at,?),next_at=? WHERE id=?").run(at,at+60000,row.id);
+    db.prepare('INSERT INTO owner_notification_attempts VALUES(?,?,?)').run(row.id,row.attempts+1,at);
+    return db.prepare('SELECT * FROM owner_notifications WHERE id=?').get(row.id);
+  });}
+  function finishNotification(row,result){
+    if(!['accepted','failed','retry'].includes(result.status))throw Error('Unexpected notification outcome.');
+    const delay=Math.max(30000*2**(row.attempts-1),result.retryAfter||0),expired=now()+delay>=row.first_attempt_at+23*3600000;
+    const status=result.status==='retry'?(row.attempts>=6||expired?'uncertain':'pending'):result.status;
+    db.prepare("UPDATE owner_notifications SET status=?,provider_id=?,last_error=?,next_at=? WHERE id=? AND status='processing' AND attempts=?").run(status,result.providerId||null,result.code||null,now()+delay,row.id,row.attempts);
+  }
+  function notificationStatus(id){return {enabled:Boolean(notifications),events:db.prepare('SELECT kind,status,attempts,created_at AS createdAt,last_error AS error FROM owner_notifications WHERE conversation_id=? ORDER BY created_at DESC,id DESC LIMIT 5').all(id)};}
   function record(id) {return db.prepare('SELECT * FROM conversations WHERE id=?').get(id);}
   function guest(id,token) {
     const row=record(id);
@@ -88,6 +125,7 @@ export function openStore(filename,{now=Date.now}={}) {
       data.estimates=db.prepare('SELECT * FROM estimates WHERE conversation_id=? ORDER BY number DESC LIMIT 50').all(id).map(estimateInfo);
       data.quoteDetails=db.prepare('SELECT address,size_of_home,stories,gutter_length FROM quote_details WHERE conversation_id=?').get(id);
       data.guestAccess={active:!row.revoked_at&&Date.parse(row.expires_at)>now(),revoked:Boolean(row.revoked_at),expiresAt:row.expires_at};
+      data.notifications=notificationStatus(id);
     }
     return data;
   }
@@ -113,11 +151,12 @@ export function openStore(filename,{now=Date.now}={}) {
       let last=null,part=0;
       for(const q of QUESTIONS) {
         const choice=input.answers.find(x=>x.field===q.field);
-        if(choice.state!=='provided') continue;
+        if(choice?.state!=='provided') continue;
         append(input.conversationId,'guide',q.prompt,input.operationId,++part,at);
         last=append(input.conversationId,'customer',choice.answer,input.operationId,++part,at);
       }
       db.prepare('INSERT INTO operations(conversation_id,operation_id,content_hash,actor,message_id,sequence,created_at) VALUES(?,?,?,?,?,?,?)').run(input.conversationId,input.operationId,input.hash,'create',last.id,last.sequence,at);
+      enqueueNotification(input.conversationId,input.operationId,'new_request',i,i.details);
       return {...view(input.conversationId),receipt:{operationId:input.operationId,messageId:last.id,sequence:last.sequence}};
     });
   }
@@ -133,6 +172,7 @@ export function openStore(filename,{now=Date.now}={}) {
       if(db.prepare('SELECT COUNT(*) AS n FROM messages WHERE conversation_id=?').get(id).n>=1000) throw fail(409,'message_limit');
       const at=stamp(),message=append(id,actor,input.body,input.operationId,0,at);
       db.prepare('INSERT INTO operations(conversation_id,operation_id,content_hash,actor,message_id,sequence,created_at) VALUES(?,?,?,?,?,?,?)').run(id,input.operationId,hash,actor,message.id,message.sequence,at);
+      if(!owner)enqueueNotification(id,input.operationId,'customer_reply',snapshot(row),input.body);
       return {ok:true,receipt:{operationId:input.operationId,messageId:message.id,sequence:message.sequence}};
     });
   }
@@ -213,5 +253,5 @@ export function openStore(filename,{now=Date.now}={}) {
     if(row.count>max)throw fail(429,'rate_limited');
     if(Math.random()<0.01)db.prepare('DELETE FROM rate_limits WHERE window_start<?').run(window-120000);
   }
-  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,addPhoto,readPhoto,saveEstimate,publishEstimate,revoke,rate,close:()=>db.close()};
+  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,addPhoto,readPhoto,saveEstimate,publishEstimate,revoke,rate,claimNotification,finishNotification,close:()=>db.close()};
 }

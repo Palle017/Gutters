@@ -24,7 +24,7 @@ test('the real service starts through the current release directory symlink',asy
       GUTTERS_DB_PATH:path.join(directory,'synthetic.sqlite3'),
       GUTTERS_OWNER_TOKEN:randomBytes(32).toString('base64url'),
       GUTTERS_PUBLIC_ORIGIN:'http://127.0.0.1:'+port,GUTTERS_ALLOWED_ORIGINS:'https://customer.invalid',
-      GUTTERS_TRUST_PROXY:'false',GUTTERS_SERVE_SITE:'false'}
+      GUTTERS_TRUST_PROXY:'false',GUTTERS_SERVE_SITE:'false',GUTTERS_EMAIL_ENABLED:'false'}
   });
   let output='';child.stdout.on('data',chunk=>output+=chunk);child.stderr.resume();
   t.after(async()=>{
@@ -39,5 +39,5 @@ test('the real service starts through the current release directory symlink',asy
   assert.ok(output.includes('"listening"'),'Startup confirmation is required.');
   const response=await fetch('http://127.0.0.1:'+port+'/healthz');
   assert.equal(response.status,200);
-  assert.deepEqual(await response.json(),{ok:true,service:'gutters-messaging',storage:'sqlite'});
+  assert.deepEqual(await response.json(),{ok:true,service:'gutters-messaging',storage:'sqlite',capabilities:{replyEmail:true}});
 });

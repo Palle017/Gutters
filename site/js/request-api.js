@@ -12,7 +12,7 @@ export function serviceURL(path) {
   return API_ORIGIN ? url.href : path;
 }
 export const REQUEST_KEY = 'everything-gutters.request.v2';
-export const FIELDS = ['name', 'phone', 'details', 'address', 'homeSize', 'stories', 'gutterLength'];
+export const FIELDS = ['name', 'phone', 'details', 'address', 'homeSize', 'stories', 'gutterLength', 'email'];
 export const MAX_PHOTOS = 6;
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -47,6 +47,7 @@ const ERROR_TEXT = {
   conversation_unavailable: 'That private request could not be opened. Check that you copied the complete private link.',
   access_expired: 'This private link has expired or was closed. Please call or text John to continue.',
   invalid_phone: 'Please enter a phone number with 10 to 15 digits.',
+  invalid_email: 'Please enter an email address John can reply to, or leave email blank.',
   rate_limited: 'There have been several requests. Wait a minute, then retry. Your existing retry details are kept.',
   operation_conflict: 'The service could not match this retry to the original request. Please keep this page open and contact John.',
   photo_limit: 'This request already has the maximum of six photos.',
@@ -87,8 +88,11 @@ export async function api(path, {method = 'GET', token, body, binary = false} = 
 }
 
 export const SERVICE_CHECK_MS = 4000;
+let replyEmailSupported = false;
+export function replyEmailAvailable() { return replyEmailSupported; }
 // Probe the configured service. Failed or unrelated responses must not enable the form.
 export async function serviceAvailable() {
+  replyEmailSupported = false;
   if (location.protocol === 'file:') return false;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SERVICE_CHECK_MS);
@@ -96,7 +100,9 @@ export async function serviceAvailable() {
     const response = await fetch(serviceURL('/healthz'), {method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer', signal: controller.signal});
     if (!response.ok) return false;
     const data = await response.json();
-    return data?.ok === true && data.service === 'gutters-messaging' && data.storage === 'sqlite';
+    const available = data?.ok === true && data.service === 'gutters-messaging' && data.storage === 'sqlite';
+    replyEmailSupported = available && data.capabilities?.replyEmail === true;
+    return available;
   } catch { return false; } finally { clearTimeout(timer); }
 }
 
