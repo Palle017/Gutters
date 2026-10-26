@@ -10,6 +10,7 @@ export const QUESTIONS = Object.freeze([
   {field:'homeSize',prompt:'What is the home size, if you know it?',max:100},
   {field:'stories',prompt:'Is the home single story or double story?',max:1},
   {field:'gutterLength',prompt:'What is the gutter length, if you know it?',max:100},
+  {field:'email',prompt:'What email can John reply to?',max:254},
 ].map(Object.freeze));
 export const FIELDS = QUESTIONS.map(x=>x.field);
 export const sha = value => createHash('sha256').update(value).digest('hex');
@@ -25,6 +26,10 @@ export function clean(value,max,{required=true}={}) {
   const text=value.trim();
   if ((required&&!text) || text.length>max || controls.test(text)) throw fail(400,'invalid_text');
   return text;
+}
+export function validateEmail(value) {
+  if(typeof value!=='string'||value.length>254||!/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/.test(value)||value.split('@')[0].length>64||value.startsWith('.')||value.includes('..')||value.includes('.@'))throw fail(400,'invalid_email');
+  const [local,domain]=value.split('@');return local+'@'+domain.toLowerCase();
 }
 export function validateCreate(input) {
   exactKeys(input,['schemaVersion','conversationId','operationId','accessToken','intake','answers']);
@@ -43,12 +48,14 @@ export function validateCreate(input) {
       byField.set(choice.field,{field:choice.field,state:choice.state}); continue;
     }
     const answer=clean(choice.answer,question.max);
+    if(choice.field==='email')validateEmail(answer);
     if (choice.field==='phone' && (!/^\+?[\d\s().-]+$/.test(answer) || !/^\d{10,15}$/.test(answer.replace(/\D/g,'')))) throw fail(400,'invalid_phone');
     if (choice.field==='stories' && !['1','2'].includes(answer)) throw fail(400,'invalid_stories');
     byField.set(choice.field,{field:choice.field,state:'provided',answer});
   }
   for (const field of ['name','phone']) if (byField.get(field)?.state!=='provided') throw fail(400,'contact_required');
-  const answers=QUESTIONS.map(({field})=>byField.get(field)||{field,state:'later'});
+  // Keep the exact v2 canonical hash for pending requests made before email existed.
+  const answers=QUESTIONS.filter(q=>q.field!=='email'||byField.has('email')).map(({field})=>byField.get(field)||{field,state:'later'});
   const intake=Object.fromEntries(answers.filter(x=>x.state==='provided').map(x=>[x.field,x.answer]));
   exactKeys(input.intake,FIELDS);
   if (JSON.stringify(Object.keys(input.intake).sort())!==JSON.stringify(Object.keys(intake).sort()) || Object.keys(intake).some(key=>input.intake[key]!==intake[key])) throw fail(400,'intake_mismatch');

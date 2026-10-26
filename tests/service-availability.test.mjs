@@ -70,10 +70,14 @@ test('estimate page: available service leaves the form untouched and sends the e
     assert.equal(document.querySelector('#request-fields').disabled, false);
     assert.equal(document.querySelector('#submit-request').disabled, false);
     assert.equal(document.querySelector('#service-notice').hidden, true);
+    assert.equal(document.querySelector('#email-field').hidden, true, 'Older APIs do not advertise reply-email support.');
+    assert.equal(document.querySelector('#email').disabled, true);
     document.querySelector('#name').value = 'Synthetic Customer'; document.querySelector('#phone').value = '(239) 555-0123';
     document.querySelector('#estimate-form').dispatchEvent(new dom.window.Event('submit', {cancelable: true}));
     await waitFor(() => !document.querySelector('#request-success').hidden);
     assert.equal(creates.length, 1);
+    assert.equal(Object.hasOwn(creates[0].intake, 'email'), false);
+    assert.equal(creates[0].answers.some(answer => answer.field === 'email'), false, 'An older API must receive its original seven-field request.');
   } finally { dom.window.close(); }
 });
 

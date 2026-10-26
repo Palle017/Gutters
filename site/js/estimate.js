@@ -1,4 +1,4 @@
-import {REQUEST_KEY, FIELDS, MAX_PHOTOS, newId, newKey, validAccess, readSession, saveSession, rememberAccess, privateLink, api, requireReceipt, readConversation, serviceAvailable, fileHash, validateSelectedPhoto, keepPhoto, getPhoto, releasePhoto, copyPrivateLink} from './request-api.js';
+import {REQUEST_KEY, FIELDS, MAX_PHOTOS, newId, newKey, validAccess, readSession, saveSession, rememberAccess, privateLink, api, requireReceipt, readConversation, serviceAvailable, replyEmailAvailable, fileHash, validateSelectedPhoto, keepPhoto, getPhoto, releasePhoto, copyPrivateLink} from './request-api.js';
 
 const form = document.querySelector('#estimate-form');
 const fieldset = document.querySelector('#request-fields');
@@ -96,9 +96,10 @@ function buildPayload() {
   const values = Object.fromEntries(FIELDS.map(field => [field, form.elements[field].value.trim()]));
   if (!values.name) throw new Error('Please enter the name John should use for your request.');
   if (Object.values(values).some(value => /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))) throw new Error('One of your entries contains an unsupported character. Please retype that detail and try again.');
+  if (values.email && (!/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/.test(values.email) || values.email.length > 254 || values.email.split('@')[0].length > 64 || values.email.startsWith('.') || values.email.includes('..') || values.email.includes('.@'))) throw new Error('Please enter a valid reply email, or leave email blank.');
   const digits = values.phone.replace(/\D/g, '');
   if (!/^\+?[\d\s().-]+$/.test(values.phone) || digits.length < 10 || digits.length > 15) throw new Error('Please enter a callback number with 10 to 15 digits.');
-  const answers = FIELDS.map(field => values[field] ? {field, state: 'provided', answer: values[field]} : {field, state: 'unknown'});
+  const answers = FIELDS.filter(field => field !== 'email' || values.email).map(field => values[field] ? {field, state: 'provided', answer: values[field]} : {field, state: 'unknown'});
   return {schemaVersion: 2, conversationId: newId(), operationId: newId(), accessToken: newKey(), intake: Object.fromEntries(Object.entries(values).filter(([, value]) => value)), answers};
 }
 async function preparePending() {
@@ -233,7 +234,11 @@ if (pending) {
 }
 renderPreviousRequests();
 serviceAvailable().then(available => {
-  if (available) return;
+  if (available) {
+    document.querySelector('#email-field').hidden = !replyEmailAvailable();
+    form.elements.email.disabled = !replyEmailAvailable();
+    return;
+  }
   serviceDown = true;
   document.querySelector('#request-entry').hidden = true;
   lockSubmitted(); submit.disabled = true;

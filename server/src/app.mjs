@@ -5,13 +5,13 @@ import {staticResponse} from './static.mjs';
 
 const SECURITY={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex, nofollow, noarchive'};
 const CSP="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
-export function createApp({dbPath,ownerToken,publicOrigin,allowedOrigins=[],now=Date.now,clientKey=()=> 'unknown',bodyLimit=24000,siteRoot=null}={}) {
+export function createApp({dbPath,ownerToken,publicOrigin,allowedOrigins=[],now=Date.now,clientKey=()=> 'unknown',bodyLimit=24000,siteRoot=null,notifications=null}={}) {
   if(!dbPath) throw Error('GUTTERS_DB_PATH is required.');
   if(typeof ownerToken!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(ownerToken)) throw Error('GUTTERS_OWNER_TOKEN must be a random 32-byte base64url key.');
   function origin(value){const url=new URL(value);if(url.origin!==value||url.username||url.password||url.protocol!=='https:'&&!(url.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(url.hostname)))throw Error('Use a canonical HTTPS origin or explicit loopback preview.');return value;}
   publicOrigin=origin(publicOrigin);
   const origins=new Set([publicOrigin,...allowedOrigins.map(origin)]);
-  const store=openStore(dbPath,{now});
+  const store=openStore(dbPath,{now,notifications,publicOrigin});
   const result=(request,status,body,extra={})=>{
     const cors=origins.has(request.headers.get('Origin'))?{'Access-Control-Allow-Origin':request.headers.get('Origin'),'Vary':'Origin'}:{};
     return new Response(status===204?null:JSON.stringify(body),{status,headers:{...SECURITY,...cors,'Content-Type':'application/json; charset=utf-8',...extra}});
@@ -47,7 +47,7 @@ export function createApp({dbPath,ownerToken,publicOrigin,allowedOrigins=[],now=
   async function fetch(request) {
     try {
       const url=new URL(request.url),path=url.pathname;
-      if(path==='/healthz'&&request.method==='GET')return result(request,200,{ok:true,storage:'sqlite',service:'gutters-messaging'});
+      if(path==='/healthz'&&request.method==='GET')return result(request,200,{ok:true,storage:'sqlite',service:'gutters-messaging',capabilities:{replyEmail:true}});
       if((path==='/owner'||path==='/owner/')&&request.method==='GET')return new Response(ownerHTML,{headers:{...SECURITY,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':CSP}});
       if(path==='/'&&!siteRoot)return result(request,200,{ok:true,service:'gutters-messaging'});
       if(path.startsWith('/owner/api/')) {
