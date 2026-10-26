@@ -27,7 +27,8 @@ const server=http.createServer(async(req,res)=>{
     const response=await app.fetch(request);res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
   } catch {res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end('{"ok":false,"error":"request_unavailable"}');}
 });
-server.requestTimeout=15000;server.headersTimeout=10000;server.keepAliveTimeout=5000;
+// The browser allows a bounded 5 MiB photo upload 60 seconds, including slow phone connections.
+server.requestTimeout=75000;server.headersTimeout=10000;server.keepAliveTimeout=5000;
 server.listen(port,host,()=>process.stdout.write(JSON.stringify({service:'gutters-messaging',listening:host+':'+port,storage:'sqlite'})+'\n'));
 let closing=false;
 function stop(){if(closing)return;closing=true;server.close(()=>{app.close();process.exit(0);});setTimeout(()=>process.exit(1),10000).unref();}

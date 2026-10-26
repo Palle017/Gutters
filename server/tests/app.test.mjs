@@ -106,7 +106,7 @@ test('oversized, malformed, extra business properties and invalid stories fail w
   assert.equal(x.app.store.db.prepare('SELECT COUNT(*) n FROM conversations').get().n,0);
 });
 test('rate limits bound anonymous creation and bad owner keys without exposing customer content',async t=>{
-  const x=setup(t);for(let i=0;i<12;i++)assert.equal((await x.call('/conversations',{method:'POST',body:input()})).status,201);
+  const x=setup(t,{clock:{value:Date.UTC(2026,9,26,12)}});for(let i=0;i<12;i++)assert.equal((await x.call('/conversations',{method:'POST',body:input()})).status,201);
   const limited=await x.call('/conversations',{method:'POST',body:input()});assert.equal(limited.status,429);assert.equal(limited.response.headers.get('Retry-After'),'60');
   for(let i=0;i<30;i++)assert.equal((await x.call('/owner/api/conversations',{origin:ownerOrigin})).status,401);
   assert.equal((await x.call('/owner/api/conversations',{origin:ownerOrigin})).status,429);assert.equal((await x.call('/owner/api/conversations',{owner:true})).status,200);

@@ -15,7 +15,7 @@ async function waitFor(check) {
 async function load(page, script, fetch, fragment = '', setup) {
   const dom = new JSDOM(await readFile(new URL(page, site), 'utf8'), {url: 'http://127.0.0.1:18965/' + page + fragment, runScripts: 'outside-only'});
   Object.defineProperty(dom.window, 'crypto', {value: webcrypto});
-  dom.window.fetch = (...args) => args[0] === '/healthz' ? Promise.resolve(response({ok: true, service: 'gutters-messaging'})) : fetch(dom.window, ...args); // availability probe: see tests/service-availability.test.mjs
+  dom.window.fetch = (...args) => args[0] === '/healthz' ? Promise.resolve(response({ok: true, storage: 'sqlite', service: 'gutters-messaging'})) : fetch(dom.window, ...args); // availability probe: see tests/service-availability.test.mjs
   if (setup) await setup(dom.window);
   const common = (await readFile(new URL('js/request-api.js', site), 'utf8')).replace(/^export /gm, '');
   const entry = (await readFile(new URL('js/' + script, site), 'utf8')).replace(/^import .*?;\s*/m, '');
