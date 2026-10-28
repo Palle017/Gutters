@@ -167,3 +167,21 @@ test('failed pending-request selection during login locks and clears private UI 
   assert.equal(x.doc.getElementById('reply').value,pending.body);
   assert.equal(x.calls.filter(call=>call.method==='POST').length,0);
 });
+
+test('successful selection focuses the loaded request; failed selection does not announce an empty heading',async t=>{
+  let unavailable=true,focused=0;
+  const x=setup(t,path=>path==='/owner/api/conversations/'+b+'?after=0'&&unavailable?json({ok:false,error:'service_busy'},503):undefined);
+  x.doc.getElementById('customer').addEventListener('focus',()=>focused++);
+  await x.login();await x.select(a);
+  assert.equal(x.doc.activeElement,x.doc.getElementById('customer'));
+  assert.equal(focused,1);
+  assert.equal(x.doc.getElementById('created').textContent,'Received '+new Date(at).toLocaleString());
+  const button=x.doc.querySelector('[data-id="'+b+'"]');button.focus();button.click();
+  await wait(()=>x.settled()&&/service is busy/.test(x.doc.getElementById('status').textContent));
+  assert.equal(focused,1);
+  unavailable=false;x.doc.getElementById('refresh').click();
+  await wait(()=>x.doc.getElementById('customer').textContent==='SYNTHETIC B'&&x.settled());
+  assert.equal(x.doc.activeElement,x.doc.getElementById('customer'));
+  assert.equal(focused,2);
+  assert.equal(x.doc.querySelector('.back-to-requests').getAttribute('href'),'#requests-heading');
+});
