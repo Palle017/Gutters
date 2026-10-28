@@ -177,6 +177,50 @@ test('private page clears fragment, hides draft estimates, and retries a reply w
   } finally { dom.window.close(); }
 });
 
+test('customer page recovers its controls when a photo body stalls past the existing deadline', async () => {
+  const timers = [];
+  let photoBody, photoSignal;
+  const dom = await load('customer.html', 'customer.js', (window, path, options) => {
+    if (path.endsWith('/photos/' + id)) {
+      photoSignal = options.signal;
+      const photo = new Response(new ReadableStream({start(controller) { photoBody = controller; }}), {headers: {'Content-Type': 'image/jpeg'}});
+      photoSignal.addEventListener('abort', () => photoBody.error(new DOMException('Synthetic stalled photo.', 'AbortError')), {once: true});
+      return Promise.resolve(photo);
+    }
+    return Promise.resolve(response({ok: true, conversation: {id, repair: {name: 'Synthetic Customer', details: 'Keep the saved project details.'}},
+      messages: [{id, role: 'customer', body: 'Keep this saved message.', createdAt: '2026-10-26T12:00:00Z'}],
+      photos: [{id, filename: 'synthetic-project.jpg'}], cursor: 1}));
+  }, '#id=' + id + '&key=' + key, window => {
+    Object.defineProperty(window, 'AbortController', {value: AbortController});
+    const schedule = window.setTimeout.bind(window), clear = window.clearTimeout.bind(window);
+    window.setTimeout = (callback, milliseconds, ...args) => {
+      if (milliseconds !== 25000) return schedule(callback, milliseconds, ...args);
+      const timer = {callback, cleared: false}; timers.push(timer); return timer;
+    };
+    window.clearTimeout = timer => { if (timers.includes(timer)) timer.cleared = true; else clear(timer); };
+  });
+  try {
+    const {document} = dom.window;
+    await waitFor(() => photoBody && document.querySelector('#customer-photos button'));
+    assert.equal(document.querySelector('#refresh-request').disabled, true);
+    assert.equal(document.querySelector('#send-message').disabled, true);
+    assert.match(document.querySelector('#project-summary').textContent, /Keep the saved project details/);
+    assert.match(document.querySelector('#message-list').textContent, /Keep this saved message/);
+    for (const timer of timers) if (!timer.cleared) timer.callback();
+    await waitFor(() => !document.querySelector('#refresh-request').disabled && !document.querySelector('#send-message').disabled);
+    assert.equal(photoSignal.aborted, true);
+    assert.match(document.querySelector('#customer-photo-status').textContent, /Some images did not load.*retry/);
+    assert.match(document.querySelector('#customer-photos').textContent, /synthetic-project.jpg.*Image could not load/);
+    assert.match(document.querySelector('#project-summary').textContent, /Keep the saved project details/);
+    assert.match(document.querySelector('#message-list').textContent, /Keep this saved message/);
+    assert.equal(document.querySelector('#customer-content').hidden, false);
+  } finally {
+    photoBody?.error(new DOMException('Test cleanup.', 'AbortError'));
+    for (let step = 0; step < 5; step++) await Promise.resolve();
+    dom.window.close();
+  }
+});
+
 test('published estimate shows the exact supplied amount and renders owner text as text', async () => {
   const dom = await load('customer.html', 'customer.js', () => Promise.resolve(response({ok: true, conversation: {id, repair: {}}, messages: [], photos: [], cursor: 0, estimate: {id, number: 'ESG-1001', status: 'published', currency: 'USD', amount: '1234.50', scope: '<img src=x onerror=alert(1)> Repair gutter corner', notes: 'Discuss the discharge route.', publishedAt: '2026-10-26T12:00:00Z'}})), '#id=' + id + '&key=' + key);
   try {
