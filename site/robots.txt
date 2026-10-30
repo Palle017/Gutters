@@ -2,5 +2,6 @@ User-agent: *
 Disallow: /owner
 Disallow: /conversations/
 Disallow: /customer.html
+Disallow: /telemetry-frame.html
 
 Sitemap: https://wisdomscreen.pro/sitemap.xml

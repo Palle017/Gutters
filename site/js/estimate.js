@@ -204,6 +204,15 @@ form.addEventListener('submit', async event => {
     const saved = await readConversation(access);
     if (saved.conversation?.id !== access.id || activePhotos().some(photo => !(saved.photos || saved.conversation?.photos || []).some(actual => actual.id === photo.photoId))) throw new Error('The final readback did not include every saved item. Retry to check your existing request.');
     pending.complete = true; pending.completedAt = new Date().toISOString(); savePending();
+    // This follows the matched durable operation receipt AND final saved-item
+    // readback. Persist before emitting so safe retries/reloads do not recount.
+    // No request identifier, contact details, private link, or photo leaves here.
+    if (!pending.analyticsRecorded) {
+      try {
+        pending.analyticsRecorded = true; savePending();
+        window.GuttersTelemetry?.requestSaved();
+      } catch { /* Analytics cannot undo a saved request. */ }
+    }
     for (const photo of pending.photos) releasePhoto(photo.id).catch(() => {});
     showSuccess();
     document.querySelector('#request-success').focus();
