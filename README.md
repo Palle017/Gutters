@@ -48,6 +48,8 @@ The original quote fields remain `address`, `size_of_home`, `stories`, and `gutt
 
 ## Evidence and verification
 
+For explicit, private aggregate Google SEO reporting, see [SEO-COLLECTION.md](docs/SEO-COLLECTION.md). The source collector is disabled by default; verified Gutters property mappings and existing authorized access are still required. It does not activate tracking, a schedule, or public reporting.
+
 ```text
 npm test
 npm run build
