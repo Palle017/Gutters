@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "website": "https://wisdomscreen.pro/",
+  "startDate": null,
+  "endDate": null,
+  "searchConsole": {"property": null, "mappingConfirmed": false},
+  "ga4": {"propertyId": null, "mappingConfirmed": false},
+  "businessProfile": {"locationId": null, "mappingConfirmed": false}
+}

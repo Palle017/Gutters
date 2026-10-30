@@ -4,6 +4,7 @@ import {dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {QUESTIONS,PHOTO_MAX_COUNT,sha,equal,fail} from './protocol.mjs';
 import {notificationPayload} from './notifications.mjs';
+import {readOwnerMetrics} from './owner-metrics.mjs';
 
 const SCHEMA=`
 CREATE TABLE IF NOT EXISTS schema_version(version INTEGER PRIMARY KEY CHECK(version=1));
@@ -253,5 +254,5 @@ export function openStore(filename,{now=Date.now,notifications=null,publicOrigin
     if(row.count>max)throw fail(429,'rate_limited');
     if(Math.random()<0.01)db.prepare('DELETE FROM rate_limits WHERE window_start<?').run(window-120000);
   }
-  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,addPhoto,readPhoto,saveEstimate,publishEstimate,revoke,rate,claimNotification,finishNotification,close:()=>db.close()};
+  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,addPhoto,readPhoto,saveEstimate,publishEstimate,revoke,rate,claimNotification,finishNotification,metrics:()=>readOwnerMetrics(db,now()),close:()=>db.close()};
 }

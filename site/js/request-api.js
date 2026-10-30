@@ -71,7 +71,7 @@ export async function api(path, {method = 'GET', token, body, binary = false} = 
   const timer = setTimeout(() => controller.abort(), body instanceof FormData ? 60000 : 25000);
   try {
     const response = await fetch(serviceURL(path), {method, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer', signal: controller.signal});
-    if (binary && response.ok) return response.blob();
+    if (binary && response.ok) return await response.blob();
     let data;
     try { data = await response.json(); } catch { throw new Error('The service did not confirm a save. Retry to check the same request, or call John at (239) 355-3686.'); }
     if (!response.ok || data.ok !== true) {
