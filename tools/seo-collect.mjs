@@ -14,7 +14,7 @@ try {
   const output = path.join(directory,new Date().toISOString().replaceAll(':','-')+'.json');
   await writeFile(output,JSON.stringify(report,null,2)+'\n',{flag:'wx',mode:0o600});
   console.log('Private SEO report saved. '+Object.entries(report.sources).map(([name,source]) => name+': '+source.state).join('; '));
-  if (Object.values(report.sources).some(source => ['failed','missing_inputs'].includes(source.state))) process.exitCode=2;
+  if (Object.values(report.sources).some(source => ['failed','missing_inputs'].includes(source.state) || source.events?.state === 'failed' || source.overviewState === 'failed')) process.exitCode=2;
 } catch {
   console.error('SEO collection did not complete. Check the private configuration and existing authorized source access.');
   process.exitCode=1;

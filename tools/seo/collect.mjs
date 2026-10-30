@@ -1,6 +1,8 @@
 // Aggregate reads only. Never import customer records, queries, URLs or raw API responses.
 const WEBSITE = 'https://wisdomscreen.pro/';
 const GA_METRICS = ['sessions', 'activeUsers', 'screenPageViews'];
+const GA_EVENTS = ['contact_click', 'quote_request_saved'];
+const GA_EVENT_METRICS = ['eventCount', 'keyEvents'];
 const GBP_METRICS = ['WEBSITE_CLICKS', 'CALL_CLICKS'];
 const blank = (state, reason) => ({state, reason, metrics:null});
 function date(value) {
@@ -66,6 +68,34 @@ function ga4(data) {
     sampled:Array.isArray(data.metadata?.samplingMetadatas) ? data.metadata.samplingMetadatas.length > 0 : null,
     hostFilter:'wisdomscreen.pro', coverage:'Host-filtered property aggregate; active users and sessions are not unique people or leads.'};
 }
+function ga4Events(data) {
+  const events = Object.fromEntries(GA_EVENTS.map(name => [name,blank('no_data','No matching aggregate row returned; tracking and event receipt are unverified.')]));
+  if (data.rowCount !== undefined && (!Number.isSafeInteger(data.rowCount) || data.rowCount < 0 || data.rowCount !== (data.rows?.length ?? 0))) throw Error('invalid_response');
+  if (data.rows === undefined || Array.isArray(data.rows) && !data.rows.length) return {state:'no_data', events};
+  if (!Array.isArray(data.rows) || data.rows.length > GA_EVENTS.length ||
+      !Array.isArray(data.dimensionHeaders) || data.dimensionHeaders.length !== 1 || data.dimensionHeaders[0].name !== 'eventName' ||
+      !Array.isArray(data.metricHeaders)) throw Error('invalid_response');
+  const seen = new Set();
+  for (const row of data.rows) {
+    const name = row.dimensionValues?.[0]?.value;
+    if (!GA_EVENTS.includes(name) || seen.has(name) || row.dimensionValues.length !== 1) throw Error('invalid_response');
+    seen.add(name);
+    const metrics = Object.fromEntries(GA_EVENT_METRICS.map(metric => {
+      const indexes = data.metricHeaders.flatMap((header,index) => header.name === metric ? [index] : []);
+      // Key-event attribution can be fractional. Event counts must be safe integers.
+      return [metric,indexes.length === 1 ? number(row.metricValues?.[indexes[0]]?.value,metric === 'eventCount') : null];
+    }));
+    events[name] = aggregate(metrics);
+  }
+  return {state:Object.values(events).every(event => event.state === 'available') ? 'available' : 'partial', events,
+    timeZone:typeof data.metadata?.timeZone === 'string' ? data.metadata.timeZone : null,
+    thresholded:typeof data.metadata?.subjectToThresholding === 'boolean' ? data.metadata.subjectToThresholding : null,
+    sampled:Array.isArray(data.metadata?.samplingMetadatas) ? data.metadata.samplingMetadatas.length > 0 : null};
+}
+const failure = error => blank('failed',['access_rejected','rate_limited','provider_error','invalid_response'].includes(error.message) ? error.message : 'request_or_response_failed');
+async function attempt(run) {
+  try {return await run();} catch (error) {return failure(error);}
+}
 function gbp(data, start, end) {
   const series = data.multiDailyMetricTimeSeries?.flatMap(group => group.dailyMetricTimeSeries || []);
   if (!Array.isArray(series) || !series.length) return blank('no_data','No daily metric series returned.');
@@ -94,7 +124,7 @@ function gbp(data, start, end) {
 export async function collectSEO(config, {env = process.env, fetcher = fetch, now = () => new Date()} = {}) {
   validateConfig(config);
   const sources = Object.fromEntries(['searchConsole','ga4','businessProfile'].map(name => [name,blank('disabled','Collection is opt-in.')]));
-  const report = {schemaVersion:1, website:WEBSITE, collectedAt:now().toISOString(), requestedWindow:config.enabled ? {startDate:config.startDate,endDate:config.endDate} : null, sources,
+  const report = {schemaVersion:2, website:WEBSITE, collectedAt:now().toISOString(), requestedWindow:config.enabled ? {startDate:config.startDate,endDate:config.endDate} : null, sources,
     limitations:['Source metrics have different definitions and time zones; never sum them into leads or jobs.','Recent data can change; this snapshot is not a freshness or complete-history guarantee.','No tracking tag, OAuth grant, schedule, customer-data import or public reporting is activated.']};
   if (!config.enabled) return report;
   const {startDate, endDate} = config;
@@ -104,10 +134,22 @@ export async function collectSEO(config, {env = process.env, fetcher = fetch, no
       sources[name] = {...blank('missing_inputs','Verified property mapping and an existing access token are required.'), missing:[...(!value ? [idKey] : []),...(!config[name].mappingConfirmed ? ['mappingConfirmed'] : []),...(!env[tokenKey] ? [tokenKey] : [])]}; return;
     }
     try { sources[name] = {...await run(value,env[tokenKey]), property:value}; }
-    catch (error) { sources[name] = blank('failed',['access_rejected','rate_limited','provider_error','invalid_response'].includes(error.message) ? error.message : 'request_or_response_failed'); }
+    catch (error) { sources[name] = failure(error); }
   }
   await source('searchConsole','property','GUTTERS_GSC_ACCESS_TOKEN',async (property,token) => gsc(await readJSON(fetcher,'https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(property)+'/searchAnalytics/query',token,{startDate,endDate,type:'web',dataState:'final',dimensionFilterGroups:[{filters:[{dimension:'page',operator:'includingRegex',expression:'^https://wisdomscreen[.]pro/'}]}]})));
-  await source('ga4','propertyId','GUTTERS_GA4_ACCESS_TOKEN',async (id,token) => ga4(await readJSON(fetcher,'https://analyticsdata.googleapis.com/v1beta/properties/'+id+':runReport',token,{dateRanges:[{startDate,endDate}], metrics:GA_METRICS.map(name => ({name})), dimensionFilter:{filter:{fieldName:'hostName',stringFilter:{matchType:'EXACT',value:'wisdomscreen.pro',caseSensitive:false}}}})));
+  await source('ga4','propertyId','GUTTERS_GA4_ACCESS_TOKEN',async (id,token) => {
+    const url = 'https://analyticsdata.googleapis.com/v1beta/properties/'+id+':runReport';
+    const hostFilter = {filter:{fieldName:'hostName',stringFilter:{matchType:'EXACT',value:'wisdomscreen.pro',caseSensitive:false}}};
+    const overview = await attempt(async () => ga4(await readJSON(fetcher,url,token,{dateRanges:[{startDate,endDate}],metrics:GA_METRICS.map(name => ({name})),dimensionFilter:hostFilter})));
+    const events = await attempt(async () => ga4Events(await readJSON(fetcher,url,token,{
+      dateRanges:[{startDate,endDate}],dimensions:[{name:'eventName'}],metrics:GA_EVENT_METRICS.map(name => ({name})),
+      dimensionFilter:{andGroup:{expressions:[hostFilter,{filter:{fieldName:'eventName',inListFilter:{values:GA_EVENTS,caseSensitive:true}}}]}},
+      limit:GA_EVENTS.length+1
+    })));
+    return {...overview,overviewState:overview.state,state:overview.state === events.state ? overview.state : 'partial',events,
+      eventDefinitions:{contact_click:'Contact-link clicks, not answered calls or qualified leads.',quote_request_saved:'Browser receipt-confirmed request events, not the authoritative SQLite request count.'},
+      eventLimitations:'Key events require separate GA4 configuration and are not retroactive. Zero keyEvents does not prove registration. Missing event rows remain unknown. Client delivery, blocking and retries can differ from backend counts.'};
+  });
   await source('businessProfile','locationId','GUTTERS_GBP_ACCESS_TOKEN',async (id,token) => {
     const url = new URL('https://businessprofileperformance.googleapis.com/v1/locations/'+id+':fetchMultiDailyMetricsTimeSeries');
     for (const metric of GBP_METRICS) url.searchParams.append('dailyMetrics',metric);
