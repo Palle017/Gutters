@@ -23,7 +23,7 @@ test('published educational cards stay in sync with the reusable content and sou
   assert.ok(advice.filter(item=>item.id!=='between-homes').every(item=>item.provenance.startsWith('Proposed')));
   assert.ok(doc.body.textContent.includes(shared.safety));
   assert.equal(doc.querySelector('form,input,textarea,select'),null,'reading must not collect personal information');
-  assert.deepEqual([...doc.querySelectorAll('script')].map(node=>node.getAttribute('src')),['js/main.js']);
+  assert.deepEqual([...doc.querySelectorAll('script')].map(node=>node.getAttribute('src')),['js/main.js','js/telemetry-config.js','js/telemetry.js']);
   assert.ok(doc.querySelector('a[href="tel:+12393553686"]'));
   assert.ok(doc.querySelector('a[href="sms:+12393553686"]'));
   assert.equal(doc.querySelectorAll('h1').length,1);

@@ -19,7 +19,7 @@ export async function renderAdvicePage() {
     '<meta name="description" content="Compare safe homeowner observations about wet ground, gutter overflow and downspout runoff. Learn when gutter work may help and when another assessment is needed.">\n'+
     '<meta name="theme-color" content="#172631">\n<title>Gutters or another water problem? | Everything Screen and Gutters</title>\n'+
     '<link rel="stylesheet" href="css/styles.css">\n<link rel="stylesheet" href="css/americana.css">\n<link rel="stylesheet" href="css/gutter-advice.css">\n'+
-    '<link rel="canonical" href="https://wisdomscreen.pro/gutter-advice.html">\n<script src="js/main.js" defer></script>\n</head>\n'+header+
+    '<link rel="canonical" href="https://wisdomscreen.pro/gutter-advice.html">\n<script src="js/main.js" defer></script>\n<script src="js/telemetry-config.js" defer></script>\n<script src="js/telemetry.js" defer></script>\n</head>\n'+header+
     '<main id="main" tabindex="-1">\n<section class="page-heading"><p class="eyebrow">FREE HOMEOWNER EDUCATION</p><h1>Start with what<br>you can observe.</h1>'+
     '<p>Gutters can help manage roof runoff. They do not solve every water problem. Explore useful observations and when another assessment may be needed.</p></section>\n'+
     '<section class="advice-content paper" aria-labelledby="advice-heading"><h2 id="advice-heading">What are you noticing?</h2>'+

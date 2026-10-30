@@ -25,6 +25,7 @@ async function load(page, script, fetch, fragment = '', setup) {
 
 test('uncertain intake retry reuses the exact operation, capability and answers before showing confirmed success', async () => {
   const attempts = [];
+  let savedEvents = 0;
   let failFirst = true;
   const dom = await load('estimate.html', 'estimate.js', (window, path, options) => {
     if (path === '/conversations') {
@@ -35,7 +36,7 @@ test('uncertain intake retry reuses the exact operation, capability and answers 
       return Promise.resolve(response({ok: true, conversation: {id: body.conversationId}, receipt: {operationId: body.operationId, sequence: 4}}));
     }
     return Promise.resolve(response({ok: true, conversation: {id: attempts[0].conversationId}, messages: [], photos: [], cursor: 0}));
-  });
+  }, '', window => { window.GuttersTelemetry = {requestSaved() { savedEvents++; }}; });
   try {
     const {document} = dom.window;
     document.querySelector('#name').value = 'Synthetic Customer'; document.querySelector('#phone').value = '(239) 555-0123'; document.querySelector('#details').value = 'Gutter repair';
@@ -43,15 +44,66 @@ test('uncertain intake retry reuses the exact operation, capability and answers 
     form.dispatchEvent(new dom.window.Event('submit', {cancelable: true}));
     await waitFor(() => attempts.length === 1 && !document.querySelector('#submit-request').disabled);
     assert.equal(document.querySelector('#request-success').hidden, true);
+    assert.equal(savedEvents, 0, 'an uncertain send is never counted as saved');
     assert.equal(document.querySelector('#request-fields').disabled, true, 'submitted answers stay locked during an uncertain retry');
     form.dispatchEvent(new dom.window.Event('submit', {cancelable: true}));
     await waitFor(() => !document.querySelector('#request-success').hidden);
     assert.equal(attempts.length, 2);
     assert.deepEqual(attempts[1], attempts[0]);
+    assert.equal(savedEvents, 1);
+    assert.equal(JSON.parse(dom.window.sessionStorage.getItem('everything-gutters.request.v2')).analyticsRecorded, true);
+    form.dispatchEvent(new dom.window.Event('submit', {cancelable: true}));
+    await waitFor(() => !document.querySelector('#submit-request').disabled);
+    assert.equal(savedEvents, 1, 'replaying the completed operation does not recount');
     assert.match(document.querySelector('#request-status').textContent, /Saved and confirmed/);
     const link = new URL(document.querySelector('#open-request').href);
     assert.equal(link.search, ''); assert.ok(link.hash.includes('key='));
   } finally { dom.window.close(); }
+});
+
+test('mismatched receipt or final readback cannot emit a saved-request event', async () => {
+  for (const badReceipt of [true, false]) {
+    let savedEvents = 0;
+    const dom = await load('estimate.html', 'estimate.js', (window, path, options) => {
+      if (path === '/conversations') {
+        const body = JSON.parse(options.body);
+        return Promise.resolve(response({ok: true, conversation: {id: body.conversationId}, receipt: {operationId: badReceipt ? 'mismatch' : body.operationId}}));
+      }
+      return Promise.resolve(response({ok: true, conversation: {id: 'wrong-readback'}, messages: [], photos: [], cursor: 0}));
+    }, '', window => { window.GuttersTelemetry = {requestSaved() { savedEvents++; }}; });
+    try {
+      const {document} = dom.window;
+      document.querySelector('#name').value = 'Synthetic Customer'; document.querySelector('#phone').value = '2395550123';
+      document.querySelector('#estimate-form').dispatchEvent(new dom.window.Event('submit', {cancelable: true}));
+      await waitFor(() => !document.querySelector('#submit-request').disabled);
+      assert.equal(document.querySelector('#request-success').hidden, true);
+      assert.equal(savedEvents, 0);
+    } finally { dom.window.close(); }
+  }
+});
+
+test('reloading a completed request does not emit again and a broken analytics hook cannot undo confirmed success', async () => {
+  const completed = {version: 2, created: true, complete: true, analyticsRecorded: true, payload: {schemaVersion: 2, conversationId: id, accessToken: key, operationId: id, intake: {name: 'Synthetic Customer', phone: '2395550123'}}, photos: []};
+  let savedEvents = 0;
+  const dom = await load('estimate.html', 'estimate.js', () => { throw Error('No intake transmission on reload.'); }, '', window => {
+    window.sessionStorage.setItem('everything-gutters.request.v2', JSON.stringify(completed));
+    window.GuttersTelemetry = {requestSaved() { savedEvents++; }};
+  });
+  try { assert.equal(dom.window.document.querySelector('#request-success').hidden, false); assert.equal(savedEvents, 0); }
+  finally { dom.window.close(); }
+  const broken = await load('estimate.html', 'estimate.js', (window, path, options) => {
+    if (path === '/conversations') {
+      const body = JSON.parse(options.body);
+      return Promise.resolve(response({ok: true, conversation: {id: body.conversationId}, receipt: {operationId: body.operationId}}));
+    }
+    return Promise.resolve(response({ok: true, conversation: {id: path.split('/')[2]}, messages: [], photos: [], cursor: 0}));
+  }, '', window => { window.GuttersTelemetry = {requestSaved() { throw Error('analytics blocked'); }}; });
+  try {
+    broken.window.document.querySelector('#name').value = 'Synthetic Customer'; broken.window.document.querySelector('#phone').value = '2395550123';
+    broken.window.document.querySelector('#estimate-form').dispatchEvent(new broken.window.Event('submit', {cancelable: true}));
+    await waitFor(() => !broken.window.document.querySelector('#request-success').hidden);
+    assert.match(broken.window.document.querySelector('#request-status').textContent, /Saved and confirmed/);
+  } finally { broken.window.close(); }
 });
 
 test('a completed request can start another project while its private access and receipt remain available', async () => {
