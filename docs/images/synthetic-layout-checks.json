@@ -1,0 +1,74 @@
+[
+  {
+    "width": 320,
+    "scrollWidth": 320,
+    "smallControls": [],
+    "inputFonts": [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    "focused": "customer",
+    "colorScheme": "dark",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "scrollWidth": 390,
+    "smallControls": [],
+    "inputFonts": [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    "focused": "customer",
+    "colorScheme": "dark",
+    "errors": []
+  },
+  {
+    "width": 768,
+    "scrollWidth": 768,
+    "smallControls": [],
+    "inputFonts": [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    "focused": "customer",
+    "colorScheme": "dark",
+    "errors": []
+  },
+  {
+    "width": 1280,
+    "scrollWidth": 1280,
+    "smallControls": [],
+    "inputFonts": [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    "focused": "customer",
+    "colorScheme": "dark",
+    "errors": []
+  }
+]
