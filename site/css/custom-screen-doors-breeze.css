@@ -1,0 +1,13 @@
+/* Approved Custom Screen Doors artwork. Scoped to avoid changes elsewhere. */
+.americana .custom-doors-breeze{padding:60px 5%;background:var(--navy,#172631);color:var(--cream,#f4ead8);scroll-margin-top:24px}
+.americana .custom-doors-breeze__inner{max-width:1400px;margin:auto}
+.americana .custom-doors-breeze__intro{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:26px}
+.americana .custom-doors-breeze h2{font-size:clamp(30px,4vw,48px);line-height:1.15}
+.americana .custom-doors-breeze__tagline{margin-top:12px;font-size:clamp(16px,1.8vw,22px);line-height:1.5;color:#eed6af}
+.americana .custom-doors-breeze__art{margin:0}
+.americana .custom-doors-breeze__art a{display:block}
+.americana .custom-doors-breeze__art img{display:block;width:100%;height:auto;object-fit:contain;border:1px solid #d5b88c80}
+.americana .custom-doors-breeze__art figcaption{padding:12px 0 0;font:12px/1.65 Arial,sans-serif;color:#c9ccc7;opacity:1}
+.americana .custom-doors-breeze__intro .button{flex-shrink:0}
+.americana .custom-doors-breeze a:focus-visible{outline:3px solid #d5b88c;outline-offset:5px}
+@media(max-width:700px){.americana .custom-doors-breeze{padding:38px 5%}.americana .custom-doors-breeze__intro{align-items:flex-start;flex-direction:column;gap:18px}.americana .custom-doors-breeze__intro .button{width:100%}.americana .custom-doors-breeze__art figcaption{font-size:11px}}
