@@ -54,6 +54,10 @@ export function createApp({dbPath,ownerToken,publicOrigin,allowedOrigins=[],now=
         if(!equal(bearer(request),ownerToken)) store.rate('owner-auth:'+sha(clientKey(request)),30);
         requireOwner(request);
         store.rate('owner-read:'+sha(clientKey(request)),240);
+        if(path==='/owner/api/metrics'){
+          if(request.method!=='GET')throw fail(405,'method_not_allowed');
+          return result(request,200,store.metrics());
+        }
         if(path==='/owner/api/conversations'&&request.method==='GET')return result(request,200,store.list({cursor:url.searchParams.get('cursor')||undefined}));
         const publish=path.match(/^\/owner\/api\/conversations\/([a-f0-9-]{36})\/estimates\/([a-f0-9-]{36})\/publish$/);
         if(publish){if(!UUID.test(publish[1])||!UUID.test(publish[2]))throw fail(404,'route_unavailable');if(request.method!=='POST')throw fail(405,'method_not_allowed');return result(request,200,store.publishEstimate(publish[1],publish[2],validatePublish(await body(request))));}

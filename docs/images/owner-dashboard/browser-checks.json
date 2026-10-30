@@ -1,0 +1,54 @@
+[
+  {
+    "width": 320,
+    "layout": {
+      "viewport": 320,
+      "pageWidth": 320,
+      "panelWidth": 296,
+      "tableRegionWidth": 266,
+      "tableScrollWidth": 580,
+      "buttons": [
+        46.796875,
+        46.796875
+      ]
+    },
+    "initialCounts": [
+      "1",
+      "0",
+      "1",
+      "1",
+      "0"
+    ],
+    "googleMetrics": null,
+    "externalRequests": 0,
+    "pageErrors": [],
+    "replyRefreshLockPreserved": true,
+    "fixture": "Synthetic in-memory Gutters app; no production or providers"
+  },
+  {
+    "width": 1280,
+    "layout": {
+      "viewport": 1280,
+      "pageWidth": 1280,
+      "panelWidth": 1124,
+      "tableRegionWidth": 1082,
+      "tableScrollWidth": 1082,
+      "buttons": [
+        46.796875,
+        46.796875
+      ]
+    },
+    "initialCounts": [
+      "1",
+      "1",
+      "1",
+      "1",
+      "0"
+    ],
+    "googleMetrics": null,
+    "externalRequests": 0,
+    "pageErrors": [],
+    "replyRefreshLockPreserved": true,
+    "fixture": "Synthetic in-memory Gutters app; no production or providers"
+  }
+]
