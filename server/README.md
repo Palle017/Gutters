@@ -14,6 +14,8 @@ Customer project images are private SQLite BLOBs in `photos`, never static websi
 
 Technical tables hold message sequences, hashed guest access, idempotent operation receipts, schema version and rate limits. `feature_operations` adds receipts for photos, draft saves and sends without changing the existing message-receipt protocol. Reusing an operation ID for changed content, actor or operation type returns 409. Transactions acknowledge only committed writes. SQLite uses WAL and FULL synchronous mode. This protects local transaction durability, not against loss of the server or disk.
 
+`/meta/webhook` is the phase-1 Instagram and Messenger intake. It stays disabled until `META_INTAKE_ENABLED=1` and it does not send to Graph unless `META_SEND_MODE=live`. Setup, the simulator, and John's schedule file are in [META-INTAKE.md](../docs/META-INTAKE.md). A completed social thread becomes a normal inbox conversation. It does not calculate a price. Email alerts remain off unless the existing notification switch is already enabled.
+
 Optional customer email is minimal contact information in the saved answers snapshot. `owner_notifications` and `owner_notification_attempts` hold atomic notification intent and bounded delivery attempts. These additive technical tables do not change quote fields. Notification payloads remain private and include no access keys or photo attachments. Direct replies from John's email app go to the customer and are separate from website messages.
 
 ## Run and verify

@@ -1,0 +1,8 @@
+{
+  "timezone": "America/New_York",
+  "weekdays": ["mon", "tue", "wed", "thu", "fri"],
+  "hours": {"start": "09:00", "end": "16:00"},
+  "leadTimeHours": 24,
+  "slotMinutes": 120,
+  "note": "Example only. John must replace these hours with the schedule he wants offered. Copy this file to the path in META_AVAILABILITY_PATH. The service does not load this example by itself and does not invent openings when that file is missing."
+}
