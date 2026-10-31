@@ -61,6 +61,34 @@ CREATE TABLE IF NOT EXISTS owner_notification_attempts(
  PRIMARY KEY(notification_id,attempt)
 );
 CREATE INDEX IF NOT EXISTS owner_notification_attempts_time ON owner_notification_attempts(started_at);
+CREATE TABLE IF NOT EXISTS meta_threads(
+ sender_key TEXT PRIMARY KEY,
+ channel TEXT NOT NULL CHECK(channel IN('meta_messenger','instagram')),
+ sender_id TEXT NOT NULL,
+ state_json TEXT NOT NULL,
+ updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meta_messages(
+ mid TEXT PRIMARY KEY,
+ sender_key TEXT NOT NULL,
+ created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meta_outbound(
+ id TEXT PRIMARY KEY,
+ sender_key TEXT NOT NULL,
+ mid TEXT NOT NULL,
+ sequence INTEGER NOT NULL,
+ body TEXT NOT NULL,
+ delivery TEXT NOT NULL CHECK(delivery IN('pending','dry-run','live','failed')),
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS meta_outbound_sequence ON meta_outbound(sequence);
+CREATE TABLE IF NOT EXISTS meta_leads(
+ conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
+ channel TEXT NOT NULL CHECK(channel IN('meta_messenger','instagram')),
+ sender_id TEXT NOT NULL,
+ created_at TEXT NOT NULL
+);
 `;
 
 export function openStore(filename,{now=Date.now,notifications=null,publicOrigin}={}) {
@@ -127,6 +155,8 @@ export function openStore(filename,{now=Date.now,notifications=null,publicOrigin
       data.quoteDetails=db.prepare('SELECT address,size_of_home,stories,gutter_length FROM quote_details WHERE conversation_id=?').get(id);
       data.guestAccess={active:!row.revoked_at&&Date.parse(row.expires_at)>now(),revoked:Boolean(row.revoked_at),expiresAt:row.expires_at};
       data.notifications=notificationStatus(id);
+      const lead=db.prepare('SELECT channel FROM meta_leads WHERE conversation_id=?').get(id);
+      if(lead)data.conversation.channel=lead.channel;
     }
     return data;
   }
@@ -136,8 +166,7 @@ export function openStore(filename,{now=Date.now,notifications=null,publicOrigin
     db.prepare('INSERT INTO messages(id,conversation_id,sequence,role,body,created_at,operation_id,part) VALUES(?,?,?,?,?,?,?,?)').run(row.id,id,sequence,role,body,at,operationId,part);
     return row;
   }
-  function create(input) {
-    return tx(()=>{
+  function insertConversation(input) {
       const existing=record(input.conversationId);
       if(existing) {
         guest(input.conversationId,input.accessToken);
@@ -159,8 +188,8 @@ export function openStore(filename,{now=Date.now,notifications=null,publicOrigin
       db.prepare('INSERT INTO operations(conversation_id,operation_id,content_hash,actor,message_id,sequence,created_at) VALUES(?,?,?,?,?,?,?)').run(input.conversationId,input.operationId,input.hash,'create',last.id,last.sequence,at);
       enqueueNotification(input.conversationId,input.operationId,'new_request',i,i.details);
       return {...view(input.conversationId),receipt:{operationId:input.operationId,messageId:last.id,sequence:last.sequence}};
-    });
   }
+  function create(input) {return tx(()=>insertConversation(input));}
   function reply(id,input,{token,owner=false}={}) {
     return tx(()=>{
       const row=owner?record(id):guest(id,token); if(!row) throw fail(404,'conversation_unavailable');
@@ -188,9 +217,9 @@ export function openStore(filename,{now=Date.now,notifications=null,publicOrigin
     let before=null;
     if(cursor){try{before=JSON.parse(Buffer.from(cursor,'base64url').toString());if(!Array.isArray(before)||before.length!==2||typeof before[0]!=='string'||typeof before[1]!=='string')throw Error();}catch{throw fail(400,'invalid_cursor');}}
     const where=before?'WHERE (c.created_at<? OR (c.created_at=? AND c.id<?))':'';
-    const query=db.prepare(`SELECT c.id,c.name,c.phone,c.created_at,c.expires_at,c.revoked_at,(SELECT MAX(sequence) FROM messages WHERE conversation_id=c.id) AS last_sequence,(SELECT role FROM messages WHERE conversation_id=c.id ORDER BY sequence DESC LIMIT 1) AS last_role FROM conversations c ${where} ORDER BY c.created_at DESC,c.id DESC LIMIT ?`);
+    const query=db.prepare(`SELECT c.id,c.name,c.phone,c.created_at,c.expires_at,c.revoked_at,(SELECT MAX(sequence) FROM messages WHERE conversation_id=c.id) AS last_sequence,(SELECT role FROM messages WHERE conversation_id=c.id ORDER BY sequence DESC LIMIT 1) AS last_role,(SELECT channel FROM meta_leads WHERE conversation_id=c.id) AS channel FROM conversations c ${where} ORDER BY c.created_at DESC,c.id DESC LIMIT ?`);
     const rows=before?query.all(before[0],before[0],before[1],limit):query.all(limit);
-    return {ok:true,conversations:rows.map(x=>({id:x.id,name:x.name,phone:x.phone,createdAt:x.created_at,expiresAt:x.expires_at,revoked:Boolean(x.revoked_at),lastSequence:x.last_sequence,lastRole:x.last_role})),nextCursor:rows.length===limit?Buffer.from(JSON.stringify([rows.at(-1).created_at,rows.at(-1).id])).toString('base64url'):null};
+    return {ok:true,conversations:rows.map(x=>{const item={id:x.id,name:x.name,phone:x.phone,createdAt:x.created_at,expiresAt:x.expires_at,revoked:Boolean(x.revoked_at),lastSequence:x.last_sequence,lastRole:x.last_role};if(x.channel)item.channel=x.channel;return item;}),nextCursor:rows.length===limit?Buffer.from(JSON.stringify([rows.at(-1).created_at,rows.at(-1).id])).toString('base64url'):null};
   }
   function updateQuote(id,quote) {
     if(!record(id))throw fail(404,'conversation_unavailable');
@@ -254,5 +283,13 @@ export function openStore(filename,{now=Date.now,notifications=null,publicOrigin
     if(row.count>max)throw fail(429,'rate_limited');
     if(Math.random()<0.01)db.prepare('DELETE FROM rate_limits WHERE window_start<?').run(window-120000);
   }
-  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,addPhoto,readPhoto,saveEstimate,publishEstimate,revoke,rate,claimNotification,finishNotification,metrics:()=>readOwnerMetrics(db,now()),close:()=>db.close()};
+  function metaHas(mid){return Boolean(db.prepare('SELECT 1 FROM meta_messages WHERE mid=?').get(mid));}
+  function metaLoad(senderKey){return db.prepare('SELECT * FROM meta_threads WHERE sender_key=?').get(senderKey);}
+  function metaSave(senderKey,channel,senderId,session,at){db.prepare('INSERT INTO meta_threads(sender_key,channel,sender_id,state_json,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(sender_key) DO UPDATE SET state_json=excluded.state_json, updated_at=excluded.updated_at').run(senderKey,channel,senderId,JSON.stringify(session),at);}
+  function metaRemember(mid,senderKey,at){db.prepare('INSERT INTO meta_messages(mid,sender_key,created_at) VALUES(?,?,?)').run(mid,senderKey,at);}
+  function metaOutbound(row){const sequence=db.prepare('SELECT COALESCE(MAX(sequence),0)+1 AS next FROM meta_outbound').get().next;db.prepare('INSERT INTO meta_outbound(id,sender_key,mid,sequence,body,delivery,created_at) VALUES(?,?,?,?,?,?,?)').run(row.id,row.senderKey,row.mid,sequence,row.body,row.delivery,row.at);}
+  function metaReviseOutbound(id,body){db.prepare('UPDATE meta_outbound SET body=? WHERE id=?').run(body,id);}
+  function metaMarkOutbound(id,delivery){db.prepare('UPDATE meta_outbound SET delivery=? WHERE id=?').run(delivery,id);}
+  function insertMetaLead(row){db.prepare('INSERT INTO meta_leads(conversation_id,channel,sender_id,created_at) VALUES(?,?,?,?)').run(row.conversationId,row.channel,row.senderId,row.at);}
+  return {db,guest,create,reply,view,operationReceipt,list,updateQuote,addPhoto,readPhoto,saveEstimate,publishEstimate,revoke,rate,claimNotification,finishNotification,inTransaction:tx,insertConversation,metaHas,metaLoad,metaSave,metaRemember,metaOutbound,metaReviseOutbound,metaMarkOutbound,insertMetaLead,metrics:()=>readOwnerMetrics(db,now()),close:()=>db.close()};
 }

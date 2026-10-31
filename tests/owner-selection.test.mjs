@@ -185,3 +185,14 @@ test('successful selection focuses the loaded request; failed selection does not
   assert.equal(focused,2);
   assert.equal(x.doc.querySelector('.back-to-requests').getAttribute('href'),'#requests-heading');
 });
+
+test('an Instagram request is labeled and a website request is not',async t=>{
+  const x=setup(t,path=>{
+    if(path==='/owner/api/conversations')return json({ok:true,conversations:[{id:a,name:'SYNTHETIC A',createdAt:at,lastRole:'customer',channel:'instagram'},{id:b,name:'SYNTHETIC B',createdAt:at,lastRole:'owner'}],nextCursor:null});
+  });
+  await x.login();
+  assert.match(x.doc.querySelector('[data-id="'+a+'"]').textContent,/Instagram/);
+  assert.doesNotMatch(x.doc.querySelector('[data-id="'+b+'"]').textContent,/Instagram|Messenger/);
+  await x.select(a);
+  assert.match(x.doc.getElementById('created').textContent,/Instagram/);
+});

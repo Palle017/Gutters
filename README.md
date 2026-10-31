@@ -44,6 +44,8 @@ Existing about, contact, services, and rescreening/restoration pages remain avai
 4. He saves a private draft, previews the saved version, and explicitly sends it. The published estimate and its owner message appear on the customer’s private page after durable readback. A changed draft requires saving and previewing again.
 5. The customer can return to the same page to read the estimate and continue the conversation. No email or SMS notification provider is connected.
 
+Phase 1 of Instagram and Messenger intake is prepared in the private service and documented in [META-INTAKE.md](docs/META-INTAKE.md). It is disabled until explicitly configured, does not send messages by default, and does not calculate a price.
+
 The original quote fields remain `address`, `size_of_home`, `stories`, and `gutter_length`. Unknown measurements remain blank; no units, automatic price formula, or inferred quantities are added. Supplied ad prices are displayed as advertising only. **John sets each estimate’s actual scope and amount.** See [server/README.md](server/README.md) for authentication, upload limits, retry receipts, and API contracts.
 
 ## Evidence and verification

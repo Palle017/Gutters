@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {realpathSync} from 'node:fs';
 import {createApp} from './app.mjs';
+import {metaSettings} from './meta-config.mjs';
 import {clientIdentity} from './client-ip.mjs';
 import {notificationConfig,startNotificationWorker} from './notifications.mjs';
 
@@ -133,6 +134,7 @@ function start() {
     dbPath:path.resolve(process.env.GUTTERS_DB_PATH||'data/gutters.sqlite3'),ownerToken:process.env.GUTTERS_OWNER_TOKEN,
     publicOrigin,allowedOrigins,notifications,clientKey:request=>request.headers.get('x-gutters-client-key')||'unknown',
     siteRoot:process.env.GUTTERS_SERVE_SITE==='true'?fileURLToPath(new URL('../../site/',import.meta.url)):null,
+    meta:metaSettings(),
   });
   const server=createHTTPServer(app,{publicOrigin,allowedOrigins,trustProxy:process.env.GUTTERS_TRUST_PROXY||'false'});
   const stopNotifications=startNotificationWorker(app.store,notifications);
