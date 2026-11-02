@@ -2,7 +2,7 @@
 
 Website and private customer-request/estimate workflow for John Wisdom’s Southwest Florida business. The current local design uses the Heritage Americana direction: navy, faded red, warm cream, rustic details, and owner-supplied project photography.
 
-The implementation includes dedicated gutter and screen pages, a project gallery, supplied advertisements, photo estimate requests, a private customer conversation page, and an owner inbox for manually writing and sending estimates. The static website is published through the manual GitHub Pages workflow at **https://wisdomscreen.pro/**. The Ubuntu request service uses loopback port **18965** behind its dedicated HTTPS route. A source merge, a Pages release, and a verified running request service are separate states; inspect the actual release and protected deployment receipts before upgrading.
+The implementation includes dedicated gutter and screen pages, a project gallery, supplied advertisements, photo estimate requests, a private customer conversation page, and an owner inbox for manually writing and sending estimates. The estimate page also has a deterministic preliminary calculator using the catalog documented in [PRELIMINARY-ESTIMATE-ASSISTANT.md](docs/PRELIMINARY-ESTIMATE-ASSISTANT.md). John still reviews and publishes each final estimate manually. The static website is published through the manual GitHub Pages workflow at **https://wisdomscreen.pro/**. The Ubuntu request service uses loopback port **18965** behind its dedicated HTTPS route. A source merge, a Pages release, and a verified running request service are separate states; inspect the actual release and protected deployment receipts before upgrading.
 
 ## Run locally
 
@@ -28,7 +28,7 @@ The local preview creates an isolated SQLite database and owner key in the ignor
 | `site/screens.html` | Screen repair, rescreening, and outdoor enclosure work. |
 | `site/projects.html` | Gallery of the supplied real project photos. |
 | `site/offers.html` | The three supplied advertisements and their stated offers. |
-| `site/estimate.html` | Customer request, optional project details, and up to six project photos. |
+| `site/estimate.html` | Guided preliminary estimate, customer request, optional project details, and up to six project photos. |
 | `site/customer.html` | Customer’s private photos, conversation, and latest published estimate. |
 | `site/css/americana.css` | Heritage Americana layout and visual treatment. |
 | `site/js/` | Navigation, customer intake, upload, private return, and reply behavior. |
@@ -38,13 +38,13 @@ Existing about, contact, services, and rescreening/restoration pages remain avai
 
 ## Request → manual estimate
 
-1. A customer provides a name and callback number, describes the work, and optionally supplies the address, home size, stories, gutter length, and project photos.
-2. The website saves the request and photos, then provides a private return link for that conversation. Image uploads are private SQLite BLOBs, not public gallery assets.
+1. A customer answers guided questions for one service and sees a preliminary amount only for catalog rules with enough information. The customer can mark unknown answers for John’s review.
+2. The customer provides a name and callback number, then optionally adds the address and project photos. The website saves the request and photos, then provides a private return link for that conversation. Image uploads are private SQLite BLOBs, not public gallery assets.
 3. John opens `/owner`, reviews the original request, photos, messages, and quote details, and manually enters the work scope, USD amount, and optional notes.
 4. He saves a private draft, previews the saved version, and explicitly sends it. The published estimate and its owner message appear on the customer’s private page after durable readback. A changed draft requires saving and previewing again.
 5. The customer can return to the same page to read the estimate and continue the conversation. No email or SMS notification provider is connected.
 
-The original quote fields remain `address`, `size_of_home`, `stories`, and `gutter_length`. Unknown measurements remain blank; no units, automatic price formula, or inferred quantities are added. Supplied ad prices are displayed as advertising only. **John sets each estimate’s actual scope and amount.** See [server/README.md](server/README.md) for authentication, upload limits, retry receipts, and API contracts.
+The original quote fields remain `address`, `size_of_home`, `stories`, and `gutter_length`. Unknown measurements remain blank; the guided conversation records customer-provided units and inputs in the request details. Supplied ad prices remain advertising only. **John sets each estimate’s final scope and amount and manually publishes it.** See [server/README.md](server/README.md) for authentication, upload limits, retry receipts, and API contracts.
 
 ## Evidence and verification
 
@@ -55,7 +55,7 @@ npm test
 npm run build
 ```
 
-The tests cover the existing conversation protocol as well as private uploads, authorization boundaries, durable retries, manual estimate draft/publication, customer-page behavior, and static build boundaries. The build copies only public `site/` files to `dist/`; customer photos, database files, and owner keys are excluded.
+The tests cover the existing conversation protocol as well as preliminary catalog pricing, guided assistant and fallback behavior, private uploads, authorization boundaries, durable retries, manual estimate draft/publication, customer-page behavior, and static build boundaries. The build copies only public `site/` files to `dist/`; customer photos, database files, and owner keys are excluded.
 
 The local browser workflow was exercised with synthetic request data, a supplied project photo in a synthetic request, a private draft, an explicit preview/send, customer estimate readback, and a reply retained after page reload. See [LOCAL-ACCEPTANCE.md](docs/LOCAL-ACCEPTANCE.md). Test estimate amounts are validation data, not business prices.
 

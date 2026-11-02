@@ -94,7 +94,10 @@ cameraInput?.addEventListener('change', choosePhotos);
 
 function buildPayload() {
   const values = Object.fromEntries(FIELDS.map(field => [field, form.elements[field].value.trim()]));
+  const assistantSummary = document.querySelector('#assistant-summary')?.value.trim() || '';
+  if (assistantSummary) values.details = [assistantSummary, values.details ? 'Additional customer notes:\n' + values.details : ''].filter(Boolean).join('\n\n');
   if (!values.name) throw new Error('Please enter the name John should use for your request.');
+  if (values.details.length > 4000) throw new Error('Please shorten the extra project notes so John can receive the complete estimate summary.');
   if (Object.values(values).some(value => /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))) throw new Error('One of your entries contains an unsupported character. Please retype that detail and try again.');
   if (values.email && (!/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/.test(values.email) || values.email.length > 254 || values.email.split('@')[0].length > 64 || values.email.startsWith('.') || values.email.includes('..') || values.email.includes('.@'))) throw new Error('Please enter a valid reply email, or leave email blank.');
   const digits = values.phone.replace(/\D/g, '');
