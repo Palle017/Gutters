@@ -4,6 +4,7 @@ import {readFile,readdir,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {JSDOM} from 'jsdom';
+import {staticResponse} from '../server/src/static.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const site=path.join(root,'site');
 test('public pages identify John and have working portable call/navigation links',async()=>{
@@ -36,4 +37,13 @@ test('Pages publication requires explicit manual workflow and static-only artifa
   const builder=await readFile(path.join(root,'tools/build.mjs'),'utf8');
   assert.match(builder,/path\.join\(root, 'site'\)/);
   assert.match(builder,/Not a public asset/);
+});
+test('the preliminary pricing catalog is served as public JSON by the loopback website service',async()=>{
+  const response=await staticResponse(site,new URL('https://wisdomscreen.pro/pricing-catalog.json'));
+  assert.ok(response);
+  assert.equal(response.headers.get('Content-Type'),'application/json; charset=utf-8');
+  const catalog=await response.json();
+  assert.equal(catalog.catalogVersion,'2026-11-01');
+  assert.equal(await staticResponse(site,new URL('https://wisdomscreen.pro/private.json')),null);
+  assert.equal(await staticResponse(site,new URL('https://wisdomscreen.pro/nested/pricing-catalog.json')),null);
 });

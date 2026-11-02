@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026-11-01",
+  "currency": "USD",
+  "services": [
+    {"id": "gutters", "label": "Seamless gutter installation"},
+    {"id": "standard_screens", "label": "Standard screen panel repair"},
+    {"id": "pool_panels", "label": "Pool enclosure screen panel repair"},
+    {"id": "pool_restoration", "label": "Pool enclosure restoration"},
+    {"id": "window_rescreen", "label": "Whole-home window rescreening"},
+    {"id": "patio_door", "label": "Sliding patio screen door rescreening"},
+    {"id": "aluminum_door", "label": "Aluminum screen door replacement"},
+    {"id": "regular_door", "label": "Regular screen door rescreening"},
+    {"id": "other", "label": "Another screen or gutter service"}
+  ],
+  "rates": {
+    "gutters": {
+      "singleStoryUnder100PerFoot": 10,
+      "singleStoryOver100PerFoot": 8,
+      "twoStoryPerFoot": 12,
+      "singleStoryDownspout": 100,
+      "twoStoryDownspout": 200,
+      "thresholdFeet": 100,
+      "standardDownspoutApproxFeet": 10
+    },
+    "standardScreens": {
+      "lowerWallPanel": 35,
+      "upperWallPanel": 75,
+      "lowerFloridaGlassPanel": 55,
+      "lowerPetScreenPanel": 75,
+      "pictureWindowPerSquareFoot": 3.5,
+      "superScreenMultiplier": 2,
+      "oversizedApproximateWidthFeet": 6,
+      "oversizedApproximateHeightFeet": 7
+    },
+    "poolPanels": {
+      "lower": {"standard": 45, "superScreen": 90},
+      "upper": {"standard": 75, "superScreen": 150},
+      "roof": {"standard": 100, "superScreen": 200}
+    },
+    "poolRestoration": {
+      "rescreeningStartingReference": 900,
+      "cleaningMinimum": 150,
+      "cleaningMaximum": 250,
+      "hurricaneCable": 150,
+      "paintRescreeningPerRunReference": 1000
+    },
+    "windowRescreen": {
+      "wholeHomePerScreen": 30
+    },
+    "patioDoor": {
+      "perDoorMinimum": 40,
+      "perDoorMaximum": 45
+    },
+    "aluminumDoor": {
+      "perDoorReference": 420,
+      "materialAndHardwareConfirmed": false
+    },
+    "regularDoor": {
+      "bottomSection": 30,
+      "topSection": 35,
+      "bothSections": 65
+    }
+  },
+  "ownerReviewRules": [
+    "Exactly 100 qualifying linear feet has no assigned single-story gutter rate.",
+    "Confirm whether the $420 aluminum screen door amount includes the replacement door, material, and hardware.",
+    "Confirm the size-based rate within the $40 to $45 sliding patio door range.",
+    "Define what counts as one run before calculating pool restoration work at the per-run reference.",
+    "Review unusual panel sizes, frame damage, structural concerns, custom work, and unpriced services."
+  ]
+}

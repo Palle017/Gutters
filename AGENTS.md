@@ -14,7 +14,7 @@ PR 2 installed `gutters.service` on Ubuntu with only `127.0.0.1:18965` listening
 
 Quote intake fields are exactly customer address, home size, one/two stories, and gutter length. Preserve unknown values as empty/NULL. Home size and gutter length are raw supplied text until John defines units and calculations. PR 8 added private photos and manually written estimate scope/amount, saved drafts and explicit publication. These are authorized workflow records; do not add automatic rates, calculations, materials, labor, scores, campaigns or speculative business variables. Minimal contact and technical IDs/timestamps/authorization/idempotency records support the requested messaging, not a general CRM.
 
-Only John can define future quote calculations. Do not evaluate customer text as code, invent a multiplier or issue an automatic quote. New information in a message does not silently rewrite the original quote fields.
+Only John can define final quote scope and amounts. Raj's direct authorization on November 1, 2026 permits a preliminary customer estimate assistant using only the rates and conditions transcribed from his screenshots into `site/pricing-catalog.json`. This scoped exception does not permit new or inferred rates, a model-generated price, or an automatic final quote. Do not evaluate customer text as code. New information in a message does not silently rewrite the original quote fields.
 
 ## Boundaries and acceptance
 
