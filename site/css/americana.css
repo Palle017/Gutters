@@ -45,3 +45,13 @@ html:has(> body.americana){scroll-padding-bottom:calc(84px + env(safe-area-inset
 .americana .reach-bar{display:none!important}
 body.americana{padding-bottom:0!important}
 }
+
+/* Keep the brand and menu within narrow phone viewports. */
+@media(max-width:400px){
+.americana .header{gap:10px;padding:18px 4%}
+.americana .wordmark{gap:8px}
+.americana .wordmark b{font-size:18px}
+.americana .brand-star{font-size:27px}
+.americana .menu-toggle{flex-shrink:0;gap:7px;padding:11px 10px;min-height:44px}
+.americana .hero h1,.americana .page-hero h1{font-size:clamp(36px,10.5vw,43px)}
+}
