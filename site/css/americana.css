@@ -16,3 +16,32 @@ body.americana{--navy:#172631;--deep:#101c25;--cream:#f4ead8;--paper:#eee3d0;--r
 .americana .door-phone:hover{text-decoration:underline}
 .americana .custom-doors-breeze__actions{display:flex;flex-direction:column;align-items:flex-start;gap:12px;flex-shrink:0}
 @media(max-width:700px){.americana .custom-doors-breeze__actions{width:100%}}
+
+/* Quiet header call/text on wide screens. Sticky call/text bar on small screens. */
+.americana .header-reach{display:none;align-items:center;gap:8px;flex:0 0 auto;margin-left:8px}
+.americana .header-reach a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 12px;border:1px solid #e6d7b866;color:var(--cream);font-size:12px;font-weight:700;letter-spacing:.04em;line-height:1}
+.americana .header nav .header-reach a{padding:0 12px}
+.americana .header nav .header-reach a:hover{border-color:var(--gold);color:#e5c08c}
+.americana .reach-bar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:30;gap:8px;margin:0;padding:8px;background:var(--navy);border-top:1px solid #e6d7b855;box-shadow:0 -8px 24px #0006}
+.americana .reach-bar a{display:flex;flex:1 1 0;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:12px 10px;font:700 16px/1.2 Arial,Helvetica,sans-serif;text-align:center}
+.americana .reach-bar a:first-child{background:var(--red);color:#fff8ed}
+.americana .reach-bar a:first-child:hover{background:#bd4b3e}
+.americana .reach-bar a:last-child{background:var(--cream);color:var(--navy)}
+.americana .reach-bar a:last-child:hover{background:#fff8eb}
+@media(min-width:901px){
+.americana .header-reach{display:flex}
+.americana .reach-bar{display:none}
+.americana .header{flex-wrap:wrap;row-gap:8px}
+.americana .header nav{flex-wrap:wrap;justify-content:flex-end;row-gap:8px}
+}
+@media(max-width:900px){
+.americana .reach-bar{display:flex;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+body.americana{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+.americana .header nav.is-open{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+html:has(> body.americana){scroll-padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+.americana :is(a,button,input,select,textarea,summary){scroll-margin-bottom:calc(84px + env(safe-area-inset-bottom))}
+}
+@media print{
+.americana .reach-bar{display:none!important}
+body.americana{padding-bottom:0!important}
+}
