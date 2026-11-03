@@ -2,7 +2,7 @@
   'use strict';
   const config = window.GUTTERS_TELEMETRY_CONFIG;
   if (window.parent === window || config?.enabled !== true || !/^G-[A-Z0-9]{6,20}$/.test(config.measurementId || '')) return;
-  const paths = new Set(['/', '/about.html', '/contact.html', '/estimate.html', '/services.html', '/gutters.html', '/screens.html', '/projects.html', '/offers.html', '/gutter-advice.html', '/gutter-repairs-cleaning-leaf-guards.html', '/rescreening-restoration.html', '/seamless-super-gutters.html', '/underground-drainage.html', '/boat-canopy-awning-tarps.html']);
+  const paths = new Set(['/', '/about.html', '/contact.html', '/estimate.html', '/services.html', '/gutters.html', '/screens.html', '/custom-screen-doors.html', '/projects.html', '/offers.html', '/gutter-advice.html', '/gutter-repairs-cleaning-leaf-guards.html', '/rescreening-restoration.html', '/seamless-super-gutters.html', '/underground-drainage.html', '/boat-canopy-awning-tarps.html']);
   let initialized = false;
   let pageLocation;
   function gtag() { window.dataLayer.push(arguments); }
