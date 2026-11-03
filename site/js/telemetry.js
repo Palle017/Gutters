@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const publicPages = new Set(['/', '/index.html', '/about.html', '/contact.html', '/estimate.html', '/services.html', '/gutters.html', '/screens.html', '/projects.html', '/offers.html', '/gutter-advice.html', '/gutter-repairs-cleaning-leaf-guards.html', '/rescreening-restoration.html', '/seamless-super-gutters.html', '/underground-drainage.html', '/boat-canopy-awning-tarps.html']);
+  const publicPages = new Set(['/', '/index.html', '/about.html', '/contact.html', '/estimate.html', '/services.html', '/gutters.html', '/screens.html', '/custom-screen-doors.html', '/projects.html', '/offers.html', '/gutter-advice.html', '/gutter-repairs-cleaning-leaf-guards.html', '/rescreening-restoration.html', '/seamless-super-gutters.html', '/underground-drainage.html', '/boat-canopy-awning-tarps.html']);
   const config = window.GUTTERS_TELEMETRY_CONFIG;
   // A preview, unknown route, private customer page, or unset property cannot send.
   if (location.origin !== 'https://wisdomscreen.pro' || !publicPages.has(location.pathname) || config?.enabled !== true || !/^G-[A-Z0-9]{6,20}$/.test(config.measurementId || '') || navigator.globalPrivacyControl === true || navigator.doNotTrack === '1') return;
