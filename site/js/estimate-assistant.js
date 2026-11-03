@@ -390,9 +390,8 @@ if (form && root) {
     requestFields.hidden = false;
     photoSection.hidden = false;
     submitSection.hidden = false;
-    renderHistoryMessage('assistant', 'That covers the project questions. Review the preliminary breakdown, then add your contact details and optional photos below.');
-    document.querySelector('#form-heading').textContent = 'Review and send your request';
-    document.querySelector('#name').focus();
+    renderHistoryMessage('assistant', 'That covers the project questions. Review the preliminary breakdown, then send your photo and phone number above. Name and address are optional.');
+    document.querySelector('#phone')?.focus();
   }
 
   function syncLegacyFields() {
@@ -429,12 +428,13 @@ if (form && root) {
   }
 
   function setManualFormVisible(visible) {
-    requestFields.hidden = !visible;
-    photoSection.hidden = !visible;
-    submitSection.hidden = !visible;
+    if (!visible) return;
+    requestFields.hidden = false;
+    photoSection.hidden = false;
+    submitSection.hidden = false;
   }
 
-  function renderQuestion() {
+  function renderQuestion({focus = true} = {}) {
     const questions = questionsFor(state.answers);
     const question = questions[state.index];
     if (!question) {
@@ -459,7 +459,7 @@ if (form && root) {
     unknown.hidden = !question.canSkip;
     next.textContent = state.index === questions.length - 1 ? 'Review preliminary estimate' : 'Continue';
     setError('');
-    firstControl?.focus();
+    if (focus) firstControl?.focus();
   }
 
   function renderHistoryMessage(role, content) {
@@ -481,10 +481,9 @@ if (form && root) {
     summary.value = '';
     result.hidden = true;
     log.replaceChildren();
-    document.querySelector('#form-heading').textContent = 'Your project details';
-    setManualFormVisible(false);
+    setManualFormVisible(true);
     renderHistoryMessage('assistant', 'I will ask about one service at a time and calculate a preliminary amount from the listed price catalog. John reviews the final scope and price.');
-    renderQuestion();
+    renderQuestion({focus: false});
   }
 
   function startReviewEdit() {
@@ -522,7 +521,8 @@ if (form && root) {
 
   async function initialize() {
     if (readSession(REQUEST_KEY)?.payload) return;
-    setManualFormVisible(false);
+    const details = document.querySelector('#assistant-details');
+    setManualFormVisible(true);
     fallback.hidden = false;
     fallback.textContent = 'Loading the preliminary estimate assistant…';
     try {
@@ -535,10 +535,12 @@ if (form && root) {
       const catalog = await response.json();
       state.catalog = validatePricingCatalog(catalog);
       root.hidden = false;
+      if (details) details.hidden = false;
       fallback.hidden = true;
       startAssistant();
     } catch {
       root.hidden = true;
+      if (details) details.hidden = true;
       setManualFormVisible(true);
       fallback.hidden = false;
       fallback.textContent = 'The estimate assistant is unavailable. You can still send John a request for a manual estimate using the form below.';

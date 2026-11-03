@@ -147,7 +147,7 @@ export function openStore(filename,{now=Date.now,notifications=null,publicOrigin
         return {...view(existing.id),receipt:receipt(saved),duplicate:true};
       }
       const at=stamp(),expires=new Date(now()+90*86400000).toISOString(),i=input.intake;
-      db.prepare('INSERT INTO conversations(id,token_hash,initial_operation,initial_hash,name,phone,answers_json,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)').run(input.conversationId,input.tokenHash,input.operationId,input.hash,i.name,i.phone,JSON.stringify(input.answers),at,expires);
+      db.prepare('INSERT INTO conversations(id,token_hash,initial_operation,initial_hash,name,phone,answers_json,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)').run(input.conversationId,input.tokenHash,input.operationId,input.hash,i.name??'',i.phone,JSON.stringify(input.answers),at,expires);
       db.prepare('INSERT INTO quote_details(conversation_id,address,size_of_home,stories,gutter_length) VALUES(?,?,?,?,?)').run(input.conversationId,i.address??null,i.homeSize??null,i.stories?Number(i.stories):null,i.gutterLength??null);
       let last=null,part=0;
       for(const q of QUESTIONS) {

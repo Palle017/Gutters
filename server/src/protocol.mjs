@@ -41,7 +41,7 @@ export function validateCreate(input) {
     const index=FIELDS.indexOf(choice.field);
     if (index<=previous || index<0 || byField.has(choice.field)) throw fail(400,'invalid_answer_order');
     previous=index;
-    const question=QUESTIONS[index],required=['name','phone'].includes(choice.field);
+    const question=QUESTIONS[index],required=choice.field==='phone';
     if (!['provided','unknown','later'].includes(choice.state)) throw fail(400,'invalid_answer_state');
     if (choice.state!=='provided') {
       if (required || Object.hasOwn(choice,'answer')) throw fail(400,'invalid_answer_state');
@@ -53,7 +53,7 @@ export function validateCreate(input) {
     if (choice.field==='stories' && !['1','2'].includes(answer)) throw fail(400,'invalid_stories');
     byField.set(choice.field,{field:choice.field,state:'provided',answer});
   }
-  for (const field of ['name','phone']) if (byField.get(field)?.state!=='provided') throw fail(400,'contact_required');
+  for (const field of ['phone']) if (byField.get(field)?.state!=='provided') throw fail(400,'contact_required');
   // Keep the exact v2 canonical hash for pending requests made before email existed.
   const answers=QUESTIONS.filter(q=>q.field!=='email'||byField.has('email')).map(({field})=>byField.get(field)||{field,state:'later'});
   const intake=Object.fromEntries(answers.filter(x=>x.state==='provided').map(x=>[x.field,x.answer]));

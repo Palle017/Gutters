@@ -47,6 +47,7 @@ const ERROR_TEXT = {
   conversation_unavailable: 'That private request could not be opened. Check that you copied the complete private link.',
   access_expired: 'This private link has expired or was closed. Please call or text John to continue.',
   invalid_phone: 'Please enter a phone number with 10 to 15 digits.',
+  contact_required: 'Add your name so this request can be saved, or text your photo and number to (239) 355-3686.',
   invalid_email: 'Please enter an email address John can reply to, or leave email blank.',
   rate_limited: 'There have been several requests. Wait a minute, then retry. Your existing retry details are kept.',
   operation_conflict: 'The service could not match this retry to the original request. Please keep this page open and contact John.',

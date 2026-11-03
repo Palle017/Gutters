@@ -26,6 +26,24 @@ function setup(t,{clock,dbPath}={}) {
   t.after(()=>{app.close();rmSync(dir,{recursive:true,force:true});});
   return {call,options,get app(){return app;},reopen(){app.close();app=createApp(options);},ownerToken};
 }
+test('a phone number without a name is saved blank and does not invent a name',async t=>{
+  const x=setup(t),request=input();
+  request.answers[0]={field:'name',state:'unknown'};
+  delete request.intake.name;
+  const out=await x.call('/conversations',{method:'POST',body:request});
+  assert.equal(out.status,201);
+  assert.equal(out.data.messages.length,2);
+  assert.equal(out.data.messages[0].body,'What phone number should John call?');
+  assert.equal(out.data.messages[1].body,'239-555-0100');
+  assert.equal(out.data.conversation.repair.fieldStates.name,'unknown');
+  assert.equal(Object.hasOwn(out.data.conversation.repair,'name'),false);
+  assert.equal(x.app.store.db.prepare('SELECT name FROM conversations').get().name,'');
+  const missingPhone=input();
+  missingPhone.answers=missingPhone.answers.filter(answer=>answer.field!=='phone');
+  delete missingPhone.intake.phone;
+  assert.equal((await x.call('/conversations',{method:'POST',body:missingPhone})).status,400);
+  assert.equal(x.app.store.db.prepare('SELECT COUNT(*) n FROM conversations').get().n,1);
+});
 test('minimum request saves one contact and four transcript rows; optional quote fields remain null',async t=>{
   const x=setup(t),request=input(),out=await x.call('/conversations',{method:'POST',body:request});
   assert.equal(out.status,201);assert.equal(out.data.ok,true);assert.equal(out.data.messages.length,4);assert.equal(out.data.receipt.sequence,4);

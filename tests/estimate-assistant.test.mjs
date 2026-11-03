@@ -23,7 +23,7 @@ test('guided estimate advances through a gutter project and reveals the calculat
 
   try {
     await import('../site/js/estimate-assistant.js?guided-test=1');
-    assert.equal(dom.window.document.querySelector('#request-fields').hidden, true, 'the old form stays hidden while the catalog loads');
+    assert.equal(dom.window.document.querySelector('#request-fields').hidden, false, 'the fast request form stays available while the catalog loads');
     resolveCatalog({ok: true, json: async () => catalog});
     await new Promise(resolve => setTimeout(resolve, 0));
     const doc = dom.window.document;
@@ -36,7 +36,7 @@ test('guided estimate advances through a gutter project and reveals the calculat
     };
 
     assert.equal(doc.querySelector('#estimate-assistant').hidden, false);
-    assert.equal(doc.querySelector('#request-fields').hidden, true);
+    assert.equal(doc.querySelector('#request-fields').hidden, false, 'photo and phone stay available during optional questions');
     doc.querySelector('#assistant-answer').value = 'gutters';
     click('#assistant-next');
     choose('assistant-answer', 'mixed');

@@ -28,7 +28,7 @@ The local preview creates an isolated SQLite database and owner key in the ignor
 | `site/screens.html` | Screen repair, rescreening, and outdoor enclosure work. |
 | `site/projects.html` | Gallery of the supplied real project photos. |
 | `site/offers.html` | The three supplied advertisements and their stated offers. |
-| `site/estimate.html` | Guided preliminary estimate, customer request, optional project details, and up to six project photos. |
+| `site/estimate.html` | Fastest request with one photo and a phone number, optional name and address, and the guided preliminary estimate. |
 | `site/customer.html` | Customer’s private photos, conversation, and latest published estimate. |
 | `site/css/americana.css` | Heritage Americana layout and visual treatment. |
 | `site/js/` | Navigation, customer intake, upload, private return, and reply behavior. |
@@ -39,7 +39,7 @@ Existing about, contact, services, and rescreening/restoration pages remain avai
 ## Request → manual estimate
 
 1. A customer answers guided questions for one service and sees a preliminary amount only for catalog rules with enough information. The customer can mark unknown answers for John’s review.
-2. The customer provides a name and callback number, then optionally adds the address and project photos. The website saves the request and photos, then provides a private return link for that conversation. Image uploads are private SQLite BLOBs, not public gallery assets.
+2. The customer can send one photo and a callback number. Name and address are optional. The website saves the request, then uploads photos when that private route accepts them. It provides a private return link for that conversation. Image uploads are private SQLite BLOBs, not public gallery assets.
 3. John opens `/owner`, reviews the original request, photos, messages, and quote details, and manually enters the work scope, USD amount, and optional notes.
 4. He saves a private draft, previews the saved version, and explicitly sends it. The published estimate and its owner message appear on the customer’s private page after durable readback. A changed draft requires saving and previewing again.
 5. The customer can return to the same page to read the estimate and continue the conversation. No email or SMS notification provider is connected.

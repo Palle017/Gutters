@@ -59,7 +59,7 @@ function displayPhotos() {
     }
     const details = document.createElement('div');
     const name = document.createElement('strong'); name.textContent = item.name;
-    const info = document.createElement('span'); info.textContent = pending ? item.status === 'saved' ? 'Saved with your request' : item.status === 'rejected' ? item.rejection || 'This photo was rejected.' : 'Waiting to upload' : (item.size / 1024 / 1024).toFixed(1) + ' MB';
+    const info = document.createElement('span'); info.textContent = pending ? item.status === 'saved' ? 'Saved with your request' : item.status === 'client-only' ? 'Still on this device. Text it to (239) 355-3686.' : item.status === 'rejected' ? item.rejection || 'This photo was rejected.' : 'Waiting to upload' : (item.size / 1024 / 1024).toFixed(1) + ' MB';
     details.append(name, info); li.append(details);
     if (!pending) {
       const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Remove'; remove.setAttribute('aria-label', 'Remove ' + item.name);
@@ -92,11 +92,20 @@ async function choosePhotos(event) {
 photoInput.addEventListener('change', choosePhotos);
 cameraInput?.addEventListener('change', choosePhotos);
 
+const JOB_TYPES = ['Gutters', 'Gutter guards', 'Screens', 'Repair', 'Other'];
+function selectedJobType() {
+  const picked = form.querySelector('input[name="jobType"]:checked')?.value || '';
+  return JOB_TYPES.includes(picked) ? picked : '';
+}
 function buildPayload() {
   const values = Object.fromEntries(FIELDS.map(field => [field, form.elements[field].value.trim()]));
   const assistantSummary = document.querySelector('#assistant-summary')?.value.trim() || '';
-  if (assistantSummary) values.details = [assistantSummary, values.details ? 'Additional customer notes:\n' + values.details : ''].filter(Boolean).join('\n\n');
-  if (!values.name) throw new Error('Please enter the name John should use for your request.');
+  const jobType = selectedJobType();
+  const parts = [];
+  if (jobType) parts.push('Job type: ' + jobType);
+  if (assistantSummary) parts.push(assistantSummary);
+  if (values.details) parts.push(parts.length ? 'Additional customer notes:\n' + values.details : values.details);
+  values.details = parts.join('\n\n');
   if (values.details.length > 4000) throw new Error('Please shorten the extra project notes so John can receive the complete estimate summary.');
   if (Object.values(values).some(value => /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))) throw new Error('One of your entries contains an unsupported character. Please retype that detail and try again.');
   if (values.email && (!/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/.test(values.email) || values.email.length > 254 || values.email.split('@')[0].length > 64 || values.email.startsWith('.') || values.email.includes('..') || values.email.includes('.@'))) throw new Error('Please enter a valid reply email, or leave email blank.');
@@ -124,11 +133,16 @@ function showSuccess() {
   const access = accessForRequest();
   document.querySelector('#request-entry').hidden = true;
   document.querySelector('#request-success').hidden = false;
-  const count = activePhotos().length;
-  document.querySelector('#success-details').textContent = 'Your project details' + (count ? ' and ' + count + (count === 1 ? ' photo are' : ' photos are') : ' are') + ' saved with your private request.';
+  const savedCount = activePhotos().filter(photo => photo.status === 'saved').length;
+  const localCount = activePhotos().filter(photo => photo.status === 'client-only').length;
+  document.querySelector('#success-details').textContent = savedCount
+    ? 'Your project details and ' + savedCount + (savedCount === 1 ? ' photo are' : ' photos are') + ' saved with your private request.'
+    : 'Your project details are saved with your private request.';
+  const photoFallback = document.querySelector('#photo-text-fallback');
+  if (photoFallback) photoFallback.hidden = localCount === 0;
   document.querySelector('#open-request').href = privateLink(access);
   document.querySelector('#copy-request-link').onclick = () => copyPrivateLink(access, document.querySelector('#private-request-link'), status);
-  showStatus('Saved and confirmed. John will prepare the scope and price after reviewing your project.');
+  showStatus('Got it, John will reach out.');
 }
 document.querySelector('#start-another-request').addEventListener('click', () => {
   if (!pending?.complete || busy || selecting) return;
@@ -140,12 +154,12 @@ document.querySelector('#start-another-request').addEventListener('click', () =>
     try { sessionStorage.removeItem(REQUEST_KEY); } catch { throw new Error('The browser could not open a new request safely. Your completed request is still available.'); }
     for (const photo of selected) URL.revokeObjectURL(photo.url);
     selected = []; pending = null; form.reset(); fieldset.disabled = false; photoInput.disabled = false; if (cameraInput) cameraInput.disabled = false;
-    submit.disabled = false; submit.textContent = 'Send request to John →';
+    submit.disabled = false; submit.textContent = 'Send to John →';
     document.querySelector('#request-success').hidden = true; document.querySelector('#request-entry').hidden = serviceDown;
     document.querySelector('#private-request-link').hidden = true; document.querySelector('#request-recovery')?.remove();
     displayPhotos(); photoMessage(''); renderPreviousRequests();
     showStatus('Ready for another project. Your earlier request and private link are listed below.');
-    form.elements.name.focus();
+    form.elements.phone.focus();
   } catch (error) { showStatus(error.message, true); }
 });
 async function removeRejectedPhoto(photo) {
@@ -189,7 +203,7 @@ form.addEventListener('submit', async event => {
     let position = 0;
     for (const photo of activePhotos()) {
       position++;
-      if (photo.status === 'saved') continue;
+      if (photo.status === 'saved' || photo.status === 'client-only') continue;
       if (photo.status === 'rejected') throw new Error('Remove the rejected photo using the action beside it to continue with your other photos.');
       showStatus('Project details saved. Uploading photo ' + position + ' of ' + activePhotos().length + '…');
       const kept = await getPhoto(photo.id);
@@ -197,7 +211,16 @@ form.addEventListener('submit', async event => {
       const body = new FormData(); body.set('operationId', photo.operationId); body.set('file', kept.file, photo.name);
       let uploaded;
       try { uploaded = await api('/conversations/' + access.id + '/photos', {method: 'POST', token: access.key, body}); }
-      catch (error) { if ([400,413,415].includes(error.status)) { photo.status = 'rejected'; photo.rejection = error.message; savePending(); displayPhotos(); } throw error; }
+      catch (error) {
+        if ([400,413,415].includes(error.status)) { photo.status = 'rejected'; photo.rejection = error.message; savePending(); displayPhotos(); throw error; }
+        if (error.code === 'route_unavailable' || [404,405,501].includes(error.status)) {
+          for (const item of activePhotos()) if (item.status === 'pending') item.status = 'client-only';
+          savePending();
+          displayPhotos();
+          break;
+        }
+        throw error;
+      }
       const receipt = requireReceipt(uploaded, photo.operationId);
       if (!uploaded.photo?.id || receipt.photoId !== uploaded.photo.id) throw new Error('The photo save was not confirmed. Retry to check the same upload.');
       photo.status = 'saved'; photo.photoId = uploaded.photo.id; savePending();
@@ -205,7 +228,8 @@ form.addEventListener('submit', async event => {
     }
     showStatus('Checking your saved request…');
     const saved = await readConversation(access);
-    if (saved.conversation?.id !== access.id || activePhotos().some(photo => !(saved.photos || saved.conversation?.photos || []).some(actual => actual.id === photo.photoId))) throw new Error('The final readback did not include every saved item. Retry to check your existing request.');
+    const uploadedPhotos = activePhotos().filter(photo => photo.status !== 'client-only');
+    if (saved.conversation?.id !== access.id || uploadedPhotos.some(photo => !(saved.photos || saved.conversation?.photos || []).some(actual => actual.id === photo.photoId))) throw new Error('The final readback did not include every saved item. Retry to check your existing request.');
     pending.complete = true; pending.completedAt = new Date().toISOString(); savePending();
     // This follows the matched durable operation receipt AND final saved-item
     // readback. Persist before emitting so safe retries/reloads do not recount.
@@ -220,6 +244,14 @@ form.addEventListener('submit', async event => {
     showSuccess();
     document.querySelector('#request-success').focus();
   } catch (error) {
+    if (pending && !pending.created && !pending.payload?.intake?.name && (error.code === 'contact_required' || error.code === 'invalid_answer_state')) {
+      for (const photo of pending.photos) releasePhoto(photo.id).catch(() => {});
+      try { sessionStorage.removeItem(REQUEST_KEY); } catch { /* The customer can still add a name or text John. */ }
+      pending = null;
+      showStatus('Add your name so this request can be saved, or text your photo and number to (239) 355-3686.', true);
+      submit.textContent = 'Send to John →';
+      return;
+    }
     showStatus((pending?.created ? 'Your project details are saved. ' : '') + error.message, true);
     if (pending?.created) {
       const access = accessForRequest();
