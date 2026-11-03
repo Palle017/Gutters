@@ -55,7 +55,7 @@ test('uncertain intake retry reuses the exact operation, capability and answers 
     form.dispatchEvent(new dom.window.Event('submit', {cancelable: true}));
     await waitFor(() => !document.querySelector('#submit-request').disabled);
     assert.equal(savedEvents, 1, 'replaying the completed operation does not recount');
-    assert.match(document.querySelector('#request-status').textContent, /Saved and confirmed/);
+    assert.match(document.querySelector('#request-status').textContent, /Got it, John will reach out/);
     const link = new URL(document.querySelector('#open-request').href);
     assert.equal(link.search, ''); assert.ok(link.hash.includes('key='));
   } finally { dom.window.close(); }
@@ -102,7 +102,7 @@ test('reloading a completed request does not emit again and a broken analytics h
     broken.window.document.querySelector('#name').value = 'Synthetic Customer'; broken.window.document.querySelector('#phone').value = '2395550123';
     broken.window.document.querySelector('#estimate-form').dispatchEvent(new broken.window.Event('submit', {cancelable: true}));
     await waitFor(() => !broken.window.document.querySelector('#request-success').hidden);
-    assert.match(broken.window.document.querySelector('#request-status').textContent, /Saved and confirmed/);
+    assert.match(broken.window.document.querySelector('#request-status').textContent, /Got it, John will reach out/);
   } finally { broken.window.close(); }
 });
 

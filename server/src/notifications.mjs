@@ -15,7 +15,7 @@ export function notificationPayload(contact,kind,message,settings,ownerOrigin) {
   if(url.origin!==ownerOrigin||url.username||url.password||url.protocol!=='https:')throw Error('Owner email links require the canonical HTTPS service origin.');
   const replyTo=contact.email?validateEmail(contact.email):null;
   const text=[kind==='new_request'?'A new website inquiry is saved.':'A customer replied to a saved inquiry.',
-    'Name: '+contact.name,'Callback: '+contact.phone,
+    'Name: '+(contact.name||'not provided'),'Callback: '+contact.phone,
     replyTo?'Reply to this email to contact the customer at '+replyTo+'.':'No reply email was provided. Use the callback number.',
     '',(message||'No project description provided.').slice(0,4000),'',
     'Open your private inbox: '+ownerOrigin+'/owner',
