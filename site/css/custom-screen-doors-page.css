@@ -1,0 +1,114 @@
+/* Dedicated door page, scoped to preserve the rest of the Americana site. */
+.custom-door-page .door-page-hero,
+.custom-door-page .door-designs,
+.custom-door-page .door-sizing,
+.custom-door-page .door-process,
+.custom-door-page .door-faq,
+.custom-door-page .door-service-area { padding: 64px 7%; }
+.custom-door-page .door-page-hero { padding-top: 26px; }
+.custom-door-page .door-breadcrumbs { margin-bottom: 40px; font-size: 12px; }
+.custom-door-page .door-breadcrumbs ol { display: flex; flex-wrap: wrap; gap: 8px 12px; list-style: none; padding: 0; margin: 0; }
+.custom-door-page .door-breadcrumbs li + li::before { content: '/'; margin-right: 12px; color: var(--gold); }
+.custom-door-page .door-breadcrumbs a { text-decoration: underline; text-underline-offset: 4px; }
+.custom-door-page .door-hero-copy { display: grid; grid-template-columns: 1.35fr 1fr; gap: 8%; align-items: end; max-width: 1400px; margin: auto; }
+.custom-door-page .door-hero-copy h1 { max-width: 14ch; font-size: clamp(43px, 4.8vw, 72px); }
+.custom-door-page .door-hero-copy .hero-lead { max-width: 570px; margin-bottom: 0; }
+.custom-door-page .door-hero-aside { padding-bottom: 3px; }
+.custom-door-page .door-hero-aside > p { color: #d5d5cc; }
+.custom-door-page .door-page-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 15px; margin-top: 26px; }
+.custom-door-page .door-page-actions > a:not(.button) { font-weight: 700; font-size: 13px; text-underline-offset: 4px; }
+.custom-door-page .door-page-actions > a:not(.button):hover { text-decoration: underline; }
+.custom-door-page .door-credentials { max-width: 1400px; margin: 34px auto 25px; font-size: 12px; color: #dfc6a2; }
+.custom-door-page .door-artwork { max-width: 1400px; margin: auto; }
+.custom-door-page .door-artwork a { display: block; }
+.custom-door-page .door-artwork img { width: 100%; height: auto; border: 1px solid #d5b88c80; }
+.custom-door-page .door-artwork figcaption { max-width: 85ch; opacity: 1; color: #d5d5cc; }
+.custom-door-page .door-section-heading { max-width: 800px; margin-bottom: 34px; }
+.custom-door-page .door-section-heading h2 { margin-bottom: 18px; }
+.custom-door-page .door-design-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+.custom-door-page .door-design { min-width: 0; background: #fff8ec; border: 1px solid #c7b99f; }
+.custom-door-page .door-card { display: block; width: 100%; padding: 0; background: #dde8e9; border: 0; color: var(--ink); text-align: left; cursor: zoom-in; }
+.custom-door-page .door-card svg { display: block; width: 100%; height: 290px; }
+.custom-door-page .door-card span { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px; background: var(--navy); color: var(--cream); font-size: 12px; font-weight: 700; }
+.custom-door-page .door-card b { font-size: 20px; }
+.custom-door-page .door-card:hover span { background: #263f4f; }
+.custom-door-page .door-card:focus-visible { position: relative; outline: 3px solid #a13b30; outline-offset: 4px; }
+.custom-door-page .door-design-copy { padding: 22px; }
+.custom-door-page .door-design-copy h3 { font-size: 28px; margin-bottom: 14px; }
+.custom-door-page .door-design-copy p { font-size: 14px; }
+.custom-door-page .door-gallery-note { margin-top: 28px; }
+.custom-door-page .door-gallery-note a,
+.custom-door-page .door-faq a { text-decoration: underline; text-underline-offset: 4px; font-weight: 700; }
+.custom-door-page .door-sizing { display: grid; grid-template-columns: 1.2fr 1fr; gap: 8%; align-items: start; }
+.custom-door-page .door-sizing h2 { margin-bottom: 25px; }
+.custom-door-page .door-sizing p + p { margin-top: 18px; }
+.custom-door-page .door-repair-note { border: 1px solid #bc9a6177; padding: 30px; }
+.custom-door-page .door-repair-note h3 { margin-bottom: 18px; }
+.custom-door-page .door-repair-note .text-link { display: block; width: fit-content; margin-top: 20px; color: #e1c59d; }
+.custom-door-page .door-process ol { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 34px; }
+.custom-door-page .door-process li { border-top: 1px solid #aa9878; padding-top: 23px; }
+.custom-door-page .door-process li > span { display: block; font-size: 12px; letter-spacing: .18em; color: var(--red); margin-bottom: 16px; }
+.custom-door-page .door-process h3 { font-size: 27px; margin-bottom: 15px; }
+.custom-door-page .door-process p { font-size: 14px; }
+.custom-door-page .door-faq details { border-top: 1px solid #bc9a6166; padding: 20px 0; }
+.custom-door-page .door-faq details:last-child { border-bottom: 1px solid #bc9a6166; }
+.custom-door-page .door-faq summary { cursor: pointer; font-size: 18px; font-weight: 700; line-height: 1.6; padding-right: 10px; }
+.custom-door-page .door-faq summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 5px; }
+.custom-door-page .door-faq details p { max-width: 85ch; margin-top: 16px; color: #d5d5cc; }
+.custom-door-page .door-service-area h2 { max-width: 800px; margin-bottom: 23px; }
+.custom-door-page .door-service-area p:not(.eyebrow) { max-width: 85ch; }
+.custom-door-page .door-service-area .button { margin-top: 25px; }
+.custom-door-page .door-modal { box-sizing: border-box; border: 1px solid #bc9a61; border-radius: 10px; padding: 24px; width: min(1060px, 94vw); max-height: 92dvh; overflow: auto; background: #f7f5ef; color: #172631; box-shadow: 0 24px 90px #0008; }
+.custom-door-page .door-modal::backdrop { background: #091a24de; }
+.custom-door-page .door-modal__close { display: block; margin: 0 0 16px auto; padding: 10px 18px; background: white; color: #172631; border: 1px solid #819aa2; border-radius: 6px; }
+.custom-door-page .door-modal__layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; align-items: center; }
+.custom-door-page .door-modal svg { width: 100%; height: min(60dvh, 620px); display: block; background: #dde8e9; border-radius: 8px; }
+.custom-door-page .door-modal h2 { font-size: clamp(1.8rem, 4vw, 3rem); line-height: 1.1; margin: 8px 0 18px; }
+.custom-door-page .door-modal p { line-height: 1.65; margin-bottom: 14px; }
+.custom-door-page .door-modal .eyebrow { color: #785122; }
+.custom-door-page .door-modal__views,
+.custom-door-page .door-modal__nav { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+.custom-door-page .door-modal__views button,
+.custom-door-page .door-modal__nav button { padding: 10px 14px; border: 1px solid #819aa2; background: white; color: #172631; border-radius: 5px; }
+.custom-door-page .door-modal__views button[aria-pressed=true] { background: #172631; color: white; }
+.custom-door-page .door-modal small { display: block; margin-top: 16px; line-height: 1.5; }
+.custom-door-page .door-modal a.button { margin-top: 12px; }
+.custom-door-page .door-modal ul { padding-left: 20px; line-height: 1.8; }
+
+@media (min-width: 1600px) {
+  .custom-door-page .door-designs,
+  .custom-door-page .door-sizing,
+  .custom-door-page .door-process,
+  .custom-door-page .door-faq,
+  .custom-door-page .door-service-area { padding-left: max(7%, calc((100% - 1400px) / 2)); padding-right: max(7%, calc((100% - 1400px) / 2)); }
+}
+@media (max-width: 950px) {
+  .custom-door-page .door-hero-copy { gap: 5%; grid-template-columns: 1.1fr 1fr; }
+  .custom-door-page .door-design-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .custom-door-page .door-sizing { gap: 5%; }
+  .custom-door-page .door-process ol { gap: 24px; }
+}
+@media (max-width: 650px) {
+  .custom-door-page .door-page-hero,
+  .custom-door-page .door-designs,
+  .custom-door-page .door-sizing,
+  .custom-door-page .door-process,
+  .custom-door-page .door-faq,
+  .custom-door-page .door-service-area { padding: 42px 7%; }
+  .custom-door-page .door-page-hero { padding-top: 22px; }
+  .custom-door-page .door-breadcrumbs { margin-bottom: 30px; font-size: 11px; }
+  .custom-door-page .door-hero-copy,
+  .custom-door-page .door-sizing,
+  .custom-door-page .door-process ol { grid-template-columns: 1fr; gap: 28px; }
+  .custom-door-page .door-hero-copy h1 { font-size: clamp(39px, 10vw, 60px); }
+  .custom-door-page .door-hero-aside > p { font-size: 14px; }
+  .custom-door-page .door-credentials { margin-top: 28px; font-size: 11px; }
+  .custom-door-page .door-design-grid { grid-template-columns: 1fr; gap: 25px; }
+  .custom-door-page .door-card svg { height: 300px; }
+  .custom-door-page .door-repair-note { padding: 25px; }
+  .custom-door-page .door-faq summary { font-size: 16px; }
+  .custom-door-page .door-faq details p { font-size: 14px; }
+  .custom-door-page .door-modal { padding: 16px; }
+  .custom-door-page .door-modal__layout { grid-template-columns: 1fr; gap: 14px; }
+  .custom-door-page .door-modal svg { height: 48dvh; }
+}
