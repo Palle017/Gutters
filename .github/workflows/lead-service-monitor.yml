@@ -1,9 +1,14 @@
-# Hourly outside-the-tailnet check that the public estimate API can accept requests.
-# A failed scheduled run makes GitHub notify the workflow owner. It reads only the
-# public /healthz route that the published website already calls; no secrets, no
-# customer data, no writes. GitHub may disable schedules after 60 days without repo
-# activity; re-enable from the Actions tab if that happens.
-name: Lead service monitor
+# Public API health/reachability check only.
+# Runs hourly (and on demand) from a GitHub-hosted runner outside the tailnet and
+# calls the public /healthz route of the Gutters request service. It shows only
+# whether that route answers with the expected health JSON. It does not test
+# durable request saving, photo upload, browser CORS or the website's fallback
+# behavior, and it is not proof that a customer request can or cannot be saved.
+# A failed run is visible in the Actions tab; whether anyone is notified depends
+# on each person's GitHub notification settings. No secrets, customer data or
+# writes are involved, and response bodies are never printed. GitHub may disable
+# schedules after 60 days without repository activity.
+name: Public API health check
 
 on:
   schedule:
@@ -22,19 +27,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check the public estimate API
+      - name: Check public API health route
+        timeout-minutes: 3
         env:
-          API_ORIGIN: https://serv2-linux.tail68bd87.ts.net:8443
+          HEALTH_URL: https://serv2-linux.tail68bd87.ts.net:8443/healthz
         run: |
           set -u
+          body_file="$(mktemp)"
           for attempt in 1 2 3; do
-            body="$(curl -sS --max-time 15 -H 'Origin: https://wisdomscreen.pro' "$API_ORIGIN/healthz" || true)"
-            if printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("ok") is True and d.get("service")=="gutters-messaging" and d.get("storage")=="sqlite" else 1)' 2>/dev/null; then
-              echo "Healthy on attempt $attempt: $body"
+            status="$(curl -sS --max-time 15 --connect-timeout 10 -o "$body_file" -w '%{http_code}' "$HEALTH_URL" 2>/dev/null || echo 000)"
+            if [ "$status" = "200" ] && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("ok") is True and d.get("service")=="gutters-messaging" and d.get("storage")=="sqlite" else 1)' "$body_file" 2>/dev/null; then
+              echo "Attempt $attempt: health route reachable and returned the expected health fields."
               exit 0
             fi
-            echo "Attempt $attempt failed: ${body:-no response}"
-            sleep 30
+            echo "Attempt $attempt: health route check failed (HTTP status $status)."
+            [ "$attempt" -lt 3 ] && sleep 30
           done
-          echo "::error::The public estimate API is not healthy. Website estimate requests cannot be saved; customers see call/text fallbacks."
+          echo "::error::Public API health route did not return the expected health response after 3 attempts."
           exit 1
