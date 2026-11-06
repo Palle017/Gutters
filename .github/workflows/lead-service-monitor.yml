@@ -1,0 +1,40 @@
+# Hourly outside-the-tailnet check that the public estimate API can accept requests.
+# A failed scheduled run makes GitHub notify the workflow owner. It reads only the
+# public /healthz route that the published website already calls; no secrets, no
+# customer data, no writes. GitHub may disable schedules after 60 days without repo
+# activity; re-enable from the Actions tab if that happens.
+name: Lead service monitor
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lead-service-monitor
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the public estimate API
+        env:
+          API_ORIGIN: https://serv2-linux.tail68bd87.ts.net:8443
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            body="$(curl -sS --max-time 15 -H 'Origin: https://wisdomscreen.pro' "$API_ORIGIN/healthz" || true)"
+            if printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("ok") is True and d.get("service")=="gutters-messaging" and d.get("storage")=="sqlite" else 1)' 2>/dev/null; then
+              echo "Healthy on attempt $attempt: $body"
+              exit 0
+            fi
+            echo "Attempt $attempt failed: ${body:-no response}"
+            sleep 30
+          done
+          echo "::error::The public estimate API is not healthy. Website estimate requests cannot be saved; customers see call/text fallbacks."
+          exit 1
