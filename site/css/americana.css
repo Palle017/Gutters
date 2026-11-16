@@ -14,6 +14,8 @@ body.americana{--navy:#172631;--deep:#101c25;--cream:#f4ead8;--paper:#eee3d0;--r
 .americana .door-jump{display:block;width:fit-content;margin-top:19px;color:#e1c59d}
 .americana .door-phone{display:inline-block;font-size:12px;font-weight:700;line-height:1.6;text-underline-offset:4px;color:#eed6af}
 .americana .door-phone:hover{text-decoration:underline}
+.americana .gg-egg{display:inline-flex;vertical-align:middle;margin-left:6px;opacity:.35;color:inherit} /* footer easter egg */
+.americana .gg-egg:hover,.americana .gg-egg:focus-visible{opacity:1}
 .americana .custom-doors-breeze__actions{display:flex;flex-direction:column;align-items:flex-start;gap:12px;flex-shrink:0}
 @media(max-width:700px){.americana .custom-doors-breeze__actions{width:100%}}
 
@@ -55,7 +57,3 @@ body.americana{padding-bottom:0!important}
 .americana .menu-toggle{flex-shrink:0;gap:7px;padding:11px 10px;min-height:44px}
 .americana .hero h1,.americana .page-hero h1{font-size:clamp(36px,10.5vw,43px)}
 }
-
-/* Easter egg: tiny gutter icon in the homepage footer. */
-.americana .gg-egg{display:inline-flex;vertical-align:middle;margin-left:6px;opacity:.35;color:inherit}
-.americana .gg-egg:hover,.americana .gg-egg:focus-visible{opacity:1}
