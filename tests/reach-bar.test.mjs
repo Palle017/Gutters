@@ -12,7 +12,7 @@ function smsBody(href) {
 }
 
 test('every visitor page has a mobile call/text bar and a quiet header control', async () => {
-  const names = (await readdir(site)).filter(name => name.endsWith('.html') && name !== 'telemetry-frame.html');
+  const names = (await readdir(site)).filter(name => name.endsWith('.html') && name !== 'telemetry-frame.html' && name !== 'gutter-guy.html'); // gutter-guy.html is a full-screen map with its own Call John button
   assert.ok(names.includes('index.html') && names.includes('screens.html') && names.includes('estimate.html'));
   for (const name of names) {
     const doc = new JSDOM(await readFile(new URL(name, site), 'utf8')).window.document;

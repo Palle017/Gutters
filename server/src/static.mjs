@@ -7,7 +7,7 @@ export async function staticResponse(root,url,method='GET'){
   let pathname;try{pathname=decodeURIComponent(url.pathname);}catch{return null;}
   if(pathname.includes('\\')||pathname.includes('\0')||pathname.split('/').some(x=>x.startsWith('.')))return null;
   const relative=pathname==='/'?'index.html':pathname.replace(/^\/+/,''),extension=path.extname(relative).toLowerCase();
-  if(!TYPES[extension]||(extension==='.json'&&relative!=='pricing-catalog.json'))return null;
+  if(!TYPES[extension]||(extension==='.json'&&!['pricing-catalog.json','data/gutter-guy.json'].includes(relative)))return null;
   try{
     const base=await realpath(root),target=await realpath(path.resolve(base,relative));
     if(!target.startsWith(base+path.sep)||!(await stat(target)).isFile())return null;

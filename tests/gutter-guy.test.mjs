@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {JSDOM} from 'jsdom';
+const site=new URL('../site/',import.meta.url);
+test('gutter-guy radar is hidden from search, wired to one data constant, and reachable from the homepage footer',async()=>{
+  const doc=new JSDOM(await readFile(new URL('gutter-guy.html',site),'utf8')).window.document;
+  assert.match(doc.querySelector('meta[name="robots"]').content,/noindex/);
+  assert.equal(doc.querySelector('link[rel="canonical"]'),null);
+  assert.ok(doc.querySelector('a[href="tel:+12393553686"]'));
+  assert.ok(doc.querySelector('#gg-center'));
+  assert.match(doc.querySelector('#gg-directions').href,/^https:\/\/www\.google\.com\/maps\/dir\//);
+  const script=await readFile(new URL('js/gutter-guy.js',site),'utf8');
+  assert.equal((script.match(/^const DATA_URL = /gm)||[]).length,1);
+  assert.match(script,/FALLBACK_URL = 'data\/gutter-guy\.json'/);
+  assert.match(script,/REFRESH_MS = 30000/);
+  const seed=JSON.parse(await readFile(new URL('data/gutter-guy.json',site),'utf8'));
+  assert.ok(Number.isFinite(seed.lat)&&Number.isFinite(seed.lng)&&!Number.isNaN(Date.parse(seed.updated)));
+  assert.doesNotMatch(await readFile(new URL('sitemap.xml',site),'utf8'),/gutter-guy/);
+  const home=new JSDOM(await readFile(new URL('index.html',site),'utf8')).window.document;
+  assert.ok(home.querySelector('footer a.gg-egg[href="gutter-guy.html"]'));
+  assert.equal(home.querySelector('#nav a[href="gutter-guy.html"]'),null);
+});

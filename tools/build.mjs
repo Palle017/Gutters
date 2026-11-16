@@ -6,7 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(root, 'site');
 const output = path.join(root, 'dist');
 const allowed = new Set(['.html','.css','.js','.mjs','.json','.svg','.png','.jpg','.jpeg','.webp','.ico','.txt','.xml','.woff2']);
-const publicJson = new Set(['pricing-catalog.json']);
+const publicJson = new Set(['pricing-catalog.json','data/gutter-guy.json']);
 const files = [];
 async function inspect(directory, prefix='') {
   for (const entry of await readdir(directory, {withFileTypes:true})) {
@@ -15,7 +15,7 @@ async function inspect(directory, prefix='') {
     if (entry.isDirectory()) await inspect(path.join(directory,entry.name),relative);
     else {
       if (path.extname(entry.name).toLowerCase() === '.json' && !publicJson.has(relative)) throw Error('Not a public asset: ' + relative);
-      if (!allowed.has(path.extname(entry.name).toLowerCase()) || /(?:^|\/)(?:\.env|data|private|server)(?:\/|$)/.test(relative)) throw Error(`Not a public asset: ${relative}`);
+      if (!allowed.has(path.extname(entry.name).toLowerCase()) || (!publicJson.has(relative) && /(?:^|\/)(?:\.env|data|private|server)(?:\/|$)/.test(relative))) throw Error(`Not a public asset: ${relative}`);
       files.push(relative);
     }
   }

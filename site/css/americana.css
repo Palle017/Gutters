@@ -55,3 +55,7 @@ body.americana{padding-bottom:0!important}
 .americana .menu-toggle{flex-shrink:0;gap:7px;padding:11px 10px;min-height:44px}
 .americana .hero h1,.americana .page-hero h1{font-size:clamp(36px,10.5vw,43px)}
 }
+
+/* Easter egg: tiny gutter icon in the homepage footer. */
+.americana .gg-egg{display:inline-flex;vertical-align:middle;margin-left:6px;opacity:.35;color:inherit}
+.americana .gg-egg:hover,.americana .gg-egg:focus-visible{opacity:1}
