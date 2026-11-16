@@ -55,3 +55,14 @@ body.americana{padding-bottom:0!important}
 .americana .menu-toggle{flex-shrink:0;gap:7px;padding:11px 10px;min-height:44px}
 .americana .hero h1,.americana .page-hero h1{font-size:clamp(36px,10.5vw,43px)}
 }
+
+/* Trust strip: existing homepage facts only. */
+.americana .trust-strip{background:var(--deep);border-top:1px solid #e6d7b833;border-bottom:1px solid #e6d7b833;padding:18px 5%}
+.americana .trust-strip ul{list-style:none;margin:0 auto;padding:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;max-width:1200px}
+.americana .trust-strip li{text-align:center;line-height:1.3}
+.americana .trust-strip li>*{display:block}
+.americana .trust-strip strong{display:block;font:700 19px/1.2 Georgia,serif;color:var(--cream)}
+.americana .trust-strip span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#d8c39f}
+.americana .trust-strip a:hover strong{color:#e5c08c}
+@media(max-width:900px){.americana .trust-strip ul{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:16px}}
+@media(max-width:420px){.americana .trust-strip ul{grid-template-columns:repeat(2,minmax(0,1fr))}.americana .trust-strip strong{font-size:17px}}
