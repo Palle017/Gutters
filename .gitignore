@@ -16,3 +16,8 @@ artifacts/
 private/
 __pycache__/
 *.pyc
+
+# Public seed for the gutter-guy radar fallback only; every other data/ path stays ignored.
+!site/data/
+site/data/*
+!site/data/gutter-guy.json
