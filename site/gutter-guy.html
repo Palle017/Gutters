@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="description" content="Where's my gutter guy? A live radar of John's truck.">
+<meta name="theme-color" content="#0b141b">
+<title>Where's my gutter guy? | Everything Screen and Gutters</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/gutter-guy.css">
+<script src="vendor/leaflet/leaflet.js" defer></script>
+<script src="js/gutter-guy.js" defer></script>
+<script src="js/telemetry-config.js" defer></script>
+<script src="js/telemetry.js" defer></script>
+</head>
+<body class="gg">
+<main id="main" class="gg-app" tabindex="-1">
+<h1 class="gg-title"><a href="index.html" aria-label="Back to Everything Screen and Gutters">★</a> Where’s my gutter guy?</h1>
+<div id="gg-map" class="gg-map" role="region" aria-label="Radar map of John’s last known location"></div>
+<section class="gg-panel" aria-live="polite">
+<p class="gg-status"><span class="gg-led" id="gg-led" aria-hidden="true"></span><span id="gg-seen">Locating John…</span></p>
+<p class="gg-coords" id="gg-coords"></p>
+<div class="gg-actions">
+<button type="button" class="gg-btn" id="gg-center">◎ Center on John</button>
+<a class="gg-btn" id="gg-directions" href="https://www.google.com/maps/dir/?api=1&amp;destination=26.64,-81.87" target="_blank" rel="noopener">➤ Get directions</a>
+<a class="gg-btn gg-call" href="tel:+12393553686">☎ Call John</a>
+</div>
+</section>
+</main>
+</body>
+</html>
