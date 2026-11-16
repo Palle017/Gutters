@@ -29,7 +29,7 @@ test('homepage search metadata identifies the actual services and verified busin
   assert.equal(nodes.length, 1);
   const business = JSON.parse(nodes[0].textContent);
   assert.equal(business['@context'], 'https://schema.org');
-  assert.equal(business['@type'], 'Organization');
+  assert.equal(business['@type'], 'LocalBusiness');
   assert.equal(business.name, 'Everything Screen and Gutters');
   assert.equal(business.url, doc.querySelector('link[rel="canonical"]').href);
   assert.equal(business.telephone, '+1-239-355-3686');
