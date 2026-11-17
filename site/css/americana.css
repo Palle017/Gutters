@@ -71,10 +71,18 @@ body.americana{padding-bottom:0!important}
 
 /* Compact the primary nav so the added page links stay usable on desktop. */
 @media (min-width: 901px) {
-  .americana .header nav { gap: 10px 12px; font-size: 11px; }
+  .americana .header nav { gap: 8px 10px; font-size: 11px; flex-wrap: wrap; justify-content: flex-end; }
   .americana .header nav > a { white-space: nowrap; }
 }
-@media (min-width: 901px) and (max-width: 1150px) {
-  .americana .header nav { gap: 8px 10px; }
+@media (min-width: 901px) and (max-width: 1280px) {
+  .americana .header nav { gap: 6px 8px; font-size: 10px; }
 }
 .americana .site-foot nav { margin: 0; font: inherit; }
+
+.americana .process-steps{padding:0;margin:0;list-style:none;counter-reset:step}
+.americana .process-steps li{padding:22px 0 22px 52px;border-bottom:1px solid #ac9d8566;position:relative;display:flex;flex-direction:column;gap:8px}
+.americana .process-steps li:before{content:counter(step);counter-increment:step;position:absolute;left:0;top:22px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid #ac9d8566;font:700 16px/1 Georgia,'Times New Roman',serif;color:var(--navy)}
+.americana .process-steps li strong{font:700 24px/1.3 Georgia,serif}
+.americana .process-steps li span{font-size:13px;color:#68675f}
+.americana .process-steps li a{text-decoration:underline;text-underline-offset:3px}
+@media(max-width:900px){.americana .process-steps li strong{font-size:25px}}
