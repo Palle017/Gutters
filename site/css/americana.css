@@ -68,3 +68,13 @@ body.americana{padding-bottom:0!important}
 .americana .trust-strip a:hover strong{color:#e5c08c}
 @media(max-width:900px){.americana .trust-strip ul{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:16px}}
 @media(max-width:420px){.americana .trust-strip ul{grid-template-columns:repeat(2,minmax(0,1fr))}.americana .trust-strip strong{font-size:17px}}
+
+/* Compact the primary nav so the added page links stay usable on desktop. */
+@media (min-width: 901px) {
+  .americana .header nav { gap: 10px 12px; font-size: 11px; }
+  .americana .header nav > a { white-space: nowrap; }
+}
+@media (min-width: 901px) and (max-width: 1150px) {
+  .americana .header nav { gap: 8px 10px; }
+}
+.americana .site-foot nav { margin: 0; font: inherit; }
