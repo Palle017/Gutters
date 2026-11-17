@@ -10,6 +10,7 @@ const pages = [
   ['screen-types.html', 'Screen types'],
   ['window-screens.html', 'Window screens'],
   ['aluminum-cage-painting.html', 'Cage painting'],
+  ['pool-cage-restoration.html', 'Cage restoration'],
   ['review.html', 'Reviews'],
   ['service-area.html', 'Service area'],
   ['why-john.html', 'Why John']
@@ -65,6 +66,8 @@ test('homepage services, story and reviews point to the new pages', async () => 
   assert.ok(services.querySelector('a[href="window-screens.html"]'));
   assert.ok(services.querySelector('a[href="aluminum-cage-painting.html"]'));
   assert.match(services.querySelector('a[href="aluminum-cage-painting.html"]').textContent, /Pool cage painting/i);
+  assert.ok(services.querySelector('a[href="pool-cage-restoration.html"]'));
+  assert.match(services.querySelector('a[href="pool-cage-restoration.html"]').textContent, /Pool cage restoration/i);
   const story = home.querySelector('.story');
   assert.ok(story.querySelector('a[href="why-john.html"]'));
   assert.ok(story.querySelector('a[href="service-area.html"]'));
